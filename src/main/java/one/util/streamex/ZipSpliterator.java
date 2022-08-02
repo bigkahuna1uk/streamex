@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,8 +20,11 @@ import java.util.Spliterators;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 
-import static one.util.streamex.UnknownSizeSpliterator.*;
-import static one.util.streamex.StreamExInternals.*;
+import static one.util.streamex.Internals.Box;
+import static one.util.streamex.Internals.drainTo;
+import static one.util.streamex.UnknownSizeSpliterator.BATCH_UNIT;
+import static one.util.streamex.UnknownSizeSpliterator.MAX_BATCH;
+import static one.util.streamex.UnknownSizeSpliterator.USOfRef;
 
 /**
  * @author Tagir Valeev
@@ -53,21 +56,21 @@ import static one.util.streamex.StreamExInternals.*;
 
     @Override
     public void forEachRemaining(Consumer<? super R> action) {
-        if(!hasCharacteristics(SIZED)) {
+        if (!hasCharacteristics(SIZED)) {
             Spliterator.super.forEachRemaining(action);
             return;
         }
         long leftSize = left.getExactSizeIfKnown();
         long rightSize = right.getExactSizeIfKnown();
-        if(leftSize <= rightSize) {
+        if (leftSize <= rightSize) {
             left.forEachRemaining(u -> {
-                if(right.tryAdvance(r)) {
+                if (right.tryAdvance(r)) {
                     action.accept(mapper.apply(u, r.a));
                 }
             });
         } else {
             right.forEachRemaining(v -> {
-                if(left.tryAdvance(l)) {
+                if (left.tryAdvance(l)) {
                     action.accept(mapper.apply(l.a, v));
                 }
             });
@@ -76,37 +79,30 @@ import static one.util.streamex.StreamExInternals.*;
 
     @Override
     public Spliterator<R> trySplit() {
-        if(trySplit && hasCharacteristics(SIZED | SUBSIZED))
-        {
+        if (trySplit && hasCharacteristics(SIZED | SUBSIZED)) {
             Spliterator<U> leftPrefix = left.trySplit();
-            if(leftPrefix == null)
+            if (leftPrefix == null)
                 return arraySplit();
             Spliterator<V> rightPrefix = right.trySplit();
-            if(rightPrefix == null)
-            {
+            if (rightPrefix == null) {
                 left = new TailConcatSpliterator<>(leftPrefix, left);
                 return arraySplit();
             }
             long leftSize = leftPrefix.getExactSizeIfKnown();
             long rightSize = rightPrefix.getExactSizeIfKnown();
-            if(leftSize >= 0 && rightSize >= 0)
-            {
-                if(leftSize == rightSize)
-                {
+            if (leftSize >= 0 && rightSize >= 0) {
+                if (leftSize == rightSize) {
                     return new ZipSpliterator<>(leftPrefix, rightPrefix, mapper, true);
                 }
-                if(Math.abs(leftSize-rightSize) < Math.min(BATCH_UNIT, Math.max(leftSize, rightSize)/8))
-                {
-                    if(leftSize < rightSize)
-                    {
+                if (Math.abs(leftSize - rightSize) < Math.min(BATCH_UNIT, Math.max(leftSize, rightSize) / 8)) {
+                    if (leftSize < rightSize) {
                         @SuppressWarnings("unchecked")
-                        U[] array = (U[]) new Object[(int) (rightSize-leftSize)];
+                        U[] array = (U[]) new Object[(int) (rightSize - leftSize)];
                         drainTo(array, left);
                         leftPrefix = new TailConcatSpliterator<>(leftPrefix, Spliterators.spliterator(array, characteristics()));
-                    } else
-                    {
+                    } else {
                         @SuppressWarnings("unchecked")
-                        V[] array = (V[]) new Object[(int) (leftSize-rightSize)];
+                        V[] array = (V[]) new Object[(int) (leftSize - rightSize)];
                         drainTo(array, right);
                         rightPrefix = new TailConcatSpliterator<>(rightPrefix, Spliterators.spliterator(array, characteristics()));
                     }
@@ -131,14 +127,14 @@ import static one.util.streamex.StreamExInternals.*;
         @SuppressWarnings("unchecked")
         R[] array = (R[]) new Object[n];
         int index = drainTo(array, this);
-        if((batch = index) == 0)
+        if ((batch = index) == 0)
             return null;
         long s2 = estimateSize();
         USOfRef<R> prefix = new UnknownSizeSpliterator.USOfRef<>(array, 0, index);
-        if(hasCharacteristics(SUBSIZED))
+        if (hasCharacteristics(SUBSIZED))
             prefix.est = index;
-        else if(s == s2)
-            prefix.est = Math.max(index, s/2);
+        else if (s == s2)
+            prefix.est = Math.max(index, s / 2);
         else
             prefix.est = Math.max(index, s2 - s);
         return prefix;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,13 +15,54 @@
  */
 package one.util.streamex;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.OptionalLong;
+import java.util.Set;
+import java.util.Spliterator;
+import java.util.Spliterators;
 import java.util.concurrent.ForkJoinPool;
-import java.util.function.*;
-import java.util.stream.*;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
+import java.util.function.BinaryOperator;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.IntFunction;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import java.util.function.ToDoubleFunction;
+import java.util.function.ToIntFunction;
+import java.util.function.ToLongFunction;
+import java.util.stream.Collector;
 import java.util.stream.Collector.Characteristics;
+import java.util.stream.Collectors;
+import java.util.stream.DoubleStream;
+import java.util.stream.IntStream;
+import java.util.stream.LongStream;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
-import static one.util.streamex.StreamExInternals.*;
+import static one.util.streamex.Internals.ArrayCollection;
+import static one.util.streamex.Internals.Box;
+import static one.util.streamex.Internals.CancelException;
+import static one.util.streamex.Internals.CancellableCollectorImpl;
+import static one.util.streamex.Internals.IMMUTABLE_TO_LIST;
+import static one.util.streamex.Internals.NONE;
+import static one.util.streamex.Internals.NO_CHARACTERISTICS;
+import static one.util.streamex.Internals.ObjDoubleBox;
+import static one.util.streamex.Internals.ObjIntBox;
+import static one.util.streamex.Internals.ObjLongBox;
+import static one.util.streamex.Internals.PairBox;
+import static one.util.streamex.Internals.finished;
+import static one.util.streamex.Internals.none;
 
 /**
  * Base class providing common functionality for {@link StreamEx} and {@link EntryStream}.
@@ -29,18 +70,18 @@ import static one.util.streamex.StreamExInternals.*;
  * @author Tagir Valeev
  *
  * @param <T> the type of the stream elements
- * @param <S> the type of of the stream extending {@code AbstractStreamEx}
+ * @param <S> the type of the stream extending {@code AbstractStreamEx}
  */
 public abstract class AbstractStreamEx<T, S extends AbstractStreamEx<T, S>> extends
         BaseStreamEx<T, Stream<T>, Spliterator<T>, S> implements Stream<T>, Iterable<T> {
     @SuppressWarnings("unchecked")
     AbstractStreamEx(Stream<? extends T> stream, StreamContext context) {
-        super((Stream<T>)stream, context);
+        super((Stream<T>) stream, context);
     }
 
     @SuppressWarnings("unchecked")
     AbstractStreamEx(Spliterator<? extends T> spliterator, StreamContext context) {
-        super((Spliterator<T>)spliterator, context);
+        super((Spliterator<T>) spliterator, context);
     }
 
     @Override
@@ -148,7 +189,12 @@ public abstract class AbstractStreamEx<T, S extends AbstractStreamEx<T, S>> exte
     public S onClose(Runnable closeHandler) {
         return (S) super.onClose(closeHandler);
     }
-
+    
+    /**
+     * @see #nonNull()
+     * @see #remove(Predicate)
+     * @see StreamEx#select(Class)
+     */
     @Override
     public S filter(Predicate<? super T> predicate) {
         return supply(stream().filter(predicate));
@@ -248,7 +294,7 @@ public abstract class AbstractStreamEx<T, S extends AbstractStreamEx<T, S>> exte
      *
      * <p>
      * This operation is not guaranteed to be stable: any of equal elements can
-     * be selected for the output. However if this stream is ordered then order
+     * be selected for the output. However, if this stream is ordered then order
      * is preserved.
      *
      * <p>
@@ -363,6 +409,60 @@ public abstract class AbstractStreamEx<T, S extends AbstractStreamEx<T, S>> exte
         if (context.fjp != null)
             return context.terminate(() -> stream().reduce(identity, accumulator, combiner));
         return stream().reduce(identity, accumulator, combiner);
+    }
+
+    /**
+     * Performs a possibly short-circuiting reduction of the stream elements using 
+     * the provided {@code BinaryOperator}. The result is described as an {@code Optional<T>}.
+     *
+     * <p>
+     * This is a short-circuiting terminal operation. It behaves like {@link #reduce(BinaryOperator)}. However,
+     * it additionally accepts a zero element (also known as absorbing element). When zero element
+     * is passed to the accumulator then the result must be zero as well. So the operation
+     * takes the advantage of this and may short-circuit if zero is reached during the reduction.
+     *
+     * @param zero zero element
+     * @param accumulator an <a href="package-summary.html#Associativity">associative</a>
+     *        , <a href="package-summary.html#NonInterference">non-interfering
+     *        </a>, <a href="package-summary.html#Statelessness">stateless</a>
+     *        function to combine two elements into one.
+     * @return the result of reduction. Empty Optional is returned if the input stream is empty.
+     * @throws NullPointerException if accumulator is null or the result of reduction is null
+     * @see MoreCollectors#reducingWithZero(Object, BinaryOperator) 
+     * @see #reduceWithZero(Object, Object, BinaryOperator)
+     * @see #reduce(BinaryOperator) 
+     * @since 0.7.3
+     */
+    public Optional<T> reduceWithZero(T zero, BinaryOperator<T> accumulator) {
+        return collect(MoreCollectors.reducingWithZero(zero, accumulator));
+    }
+
+    /**
+     * Performs a possibly short-circuiting reduction of the stream elements using 
+     * the provided identity value and a {@code BinaryOperator}.
+     *
+     * <p>
+     * This is a short-circuiting terminal operation. It behaves like {@link #reduce(Object, BinaryOperator)}. 
+     * However, it additionally accepts a zero element (also known as absorbing element). When zero element
+     * is passed to the accumulator then the result must be zero as well. So the operation
+     * takes the advantage of this and may short-circuit if zero is reached during the reduction.
+     *
+     * @param zero zero element
+     * @param identity an identity element. For all {@code t}, {@code accumulator.apply(t, identity)} is
+     *                 equal to {@code accumulator.apply(identity, t)} and is equal to {@code t}.
+     * @param accumulator an <a href="package-summary.html#Associativity">associative</a>
+     *        , <a href="package-summary.html#NonInterference">non-interfering
+     *        </a>, <a href="package-summary.html#Statelessness">stateless</a>
+     *        function to combine two elements into one.
+     * @return the result of reduction. Empty Optional is returned if the input stream is empty.
+     * @throws NullPointerException if accumulator is null or the result of reduction is null
+     * @see MoreCollectors#reducingWithZero(Object, Object, BinaryOperator) 
+     * @see #reduceWithZero(Object, BinaryOperator) 
+     * @see #reduce(Object, BinaryOperator) 
+     * @since 0.7.3
+     */
+    public T reduceWithZero(T zero, T identity, BinaryOperator<T> accumulator) {
+        return collect(MoreCollectors.reducingWithZero(zero, identity, accumulator));
     }
 
     @Override
@@ -509,20 +609,16 @@ public abstract class AbstractStreamEx<T, S extends AbstractStreamEx<T, S>> exte
      */
     public OptionalLong indexOf(Predicate<? super T> predicate) {
         return collect(new CancellableCollectorImpl<>(() -> new long[]{-1}, (acc, t) -> {
-            if (acc[0] < 0) {
-                if (predicate.test(t)) {
-                    acc[0] = -acc[0] - 1;
-                } else {
-                    acc[0]--;
-                }
+            if (predicate.test(t)) {
+                acc[0] = -acc[0] - 1;
+            } else {
+                acc[0]--;
             }
         }, (acc1, acc2) -> {
-            if (acc1[0] < 0) {
-                if (acc2[0] < 0) {
-                    acc1[0] = acc1[0] + acc2[0] + 1;
-                } else {
-                    acc1[0] = acc2[0] - acc1[0] - 1;
-                }
+            if (acc2[0] < 0) {
+                acc1[0] = acc1[0] + acc2[0] + 1;
+            } else {
+                acc1[0] = acc2[0] - acc1[0] - 1;
             }
             return acc1;
         }, acc -> acc[0] < 0 ? OptionalLong.empty() : OptionalLong.of(acc[0]), acc -> acc[0] >= 0, NO_CHARACTERISTICS));
@@ -622,6 +718,29 @@ public abstract class AbstractStreamEx<T, S extends AbstractStreamEx<T, S>> exte
     }
 
     /**
+     * Returns a stream consisting of the results of applying the given function
+     * to the every adjacent pair of elements of this stream.
+     *
+     * <p>
+     * This is a <a href="package-summary.html#StreamOps">quasi-intermediate</a>
+     * operation.
+     *
+     * <p>
+     * The output stream will contain one element less than this stream. If this
+     * stream contains zero or one element the output stream will be empty.
+     *
+     * @param <R> The element type of the new stream
+     * @param mapper a non-interfering, stateless function to apply to each
+     *        adjacent pair of this stream elements.
+     * @return the new stream
+     * @since 0.2.1
+     */
+    public <R> StreamEx<R> pairMap(BiFunction<? super T, ? super T, ? extends R> mapper) {
+        PairSpliterator.PSOfRef<T, R> spliterator = new PairSpliterator.PSOfRef<>(mapper, spliterator());
+        return new StreamEx<>(spliterator, context);
+    }
+
+    /**
      * Returns a stream consisting of the elements of this stream that don't
      * match the given predicate.
      *
@@ -635,6 +754,9 @@ public abstract class AbstractStreamEx<T, S extends AbstractStreamEx<T, S>> exte
      *        predicate to apply to each element to determine if it should be
      *        excluded
      * @return the new stream
+     * @see #filter(Predicate)
+     * @see #nonNull()
+     * @see StreamEx#select(Class)
      */
     public S remove(Predicate<? super T> predicate) {
         return filter(predicate.negate());
@@ -649,6 +771,9 @@ public abstract class AbstractStreamEx<T, S extends AbstractStreamEx<T, S>> exte
      * operation</a>.
      *
      * @return the new stream
+     * @see #filter(Predicate)
+     * @see #remove(Predicate)
+     * @see StreamEx#select(Class)
      */
     public S nonNull() {
         return filter(Objects::nonNull);
@@ -1145,8 +1270,8 @@ public abstract class AbstractStreamEx<T, S extends AbstractStreamEx<T, S>> exte
     }
 
     /**
-     * Returns a stream which contents is the same as this stream, except the case when
-     * this stream is empty. In this case its contents is replaced with other stream contents.
+     * Returns a stream whose content is the same as this stream, except the case when
+     * this stream is empty. In this case, its contents is replaced with other stream contents.
      *
      * <p>
      * The other stream will not be traversed if this stream is not empty.
@@ -1159,8 +1284,7 @@ public abstract class AbstractStreamEx<T, S extends AbstractStreamEx<T, S>> exte
      * operation</a>.
      *
      * @param other other stream to replace the contents of this stream if this stream is empty.
-     * @return the stream which contents is replaced by other stream contents only if
-     * this stream is empty.
+     * @return the stream whose content is replaced by other stream contents only if this stream is empty.
      * @since 0.6.6
      */
     public S ifEmpty(Stream<? extends T> other) {
@@ -1168,11 +1292,28 @@ public abstract class AbstractStreamEx<T, S extends AbstractStreamEx<T, S>> exte
     }
 
     /**
-     * Returns a {@link List} containing the elements of this stream. The
-     * returned {@code List} is guaranteed to be mutable, but there are no
-     * guarantees on the type, serializability, or thread-safety; if more
-     * control over the returned {@code List} is required, use
-     * {@link #toCollection(Supplier)}.
+     * Returns a {@link List} containing the elements of this stream. There
+     * are no guarantees on the type, mutability, serializability, or thread-safety
+     * of the returned {@code List}; if more control over the returned
+     * {@code List} is required, use {@link #toCollection(Supplier)}.
+     *
+     * <p>
+     * This is a terminal operation.
+     *
+     * @return a {@code List} containing the elements of this stream
+     * @see Collectors#toList()
+     * @see #toMutableList()
+     * @see #toImmutableList()
+     */
+    public List<T> toList() {
+        return IMMUTABLE_TO_LIST ? toImmutableList() : toMutableList();
+    }
+
+    /**
+     * Returns a mutable {@link List} containing the elements of this stream.
+     * There are no guarantees on the type, serializability, or thread-safety
+     * of the returned {@code List}; if more control over the returned
+     * {@code List} is required, use {@link #toCollection(Supplier)}.
      *
      * <p>
      * This is a terminal operation.
@@ -1180,9 +1321,10 @@ public abstract class AbstractStreamEx<T, S extends AbstractStreamEx<T, S>> exte
      * @return a {@code List} containing the elements of this stream
      * @see Collectors#toList()
      * @see #toImmutableList()
+     * @since 0.8.0
      */
     @SuppressWarnings("unchecked")
-    public List<T> toList() {
+    public List<T> toMutableList() {
         return new ArrayList<>((Collection<T>) new ArrayCollection(toArray(Object[]::new)));
     }
 
@@ -1197,12 +1339,13 @@ public abstract class AbstractStreamEx<T, S extends AbstractStreamEx<T, S>> exte
      *
      * @return a {@code List} containing the elements of this stream
      * @see #toList()
+     * @see #toMutableList()
      * @since 0.6.3
      */
     @SuppressWarnings("unchecked")
     public List<T> toImmutableList() {
         Object[] array = toArray(Object[]::new);
-        switch(array.length) {
+        switch (array.length) {
         case 0:
             return Collections.emptyList();
         case 1:
@@ -1230,24 +1373,43 @@ public abstract class AbstractStreamEx<T, S extends AbstractStreamEx<T, S>> exte
      */
     public <R> R toListAndThen(Function<? super List<T>, R> finisher) {
         if (context.fjp != null)
-            return context.terminate(() -> finisher.apply(toList()));
-        return finisher.apply(toList());
+            return context.terminate(() -> finisher.apply(toMutableList()));
+        return finisher.apply(toMutableList());
     }
 
     /**
-     * Returns a {@link Set} containing the elements of this stream. The
-     * returned {@code Set} is guaranteed to be mutable, but there are no
-     * guarantees on the type, serializability, or thread-safety; if more
-     * control over the returned {@code Set} is required, use
-     * {@link #toCollection(Supplier)}.
+     * Returns a {@link Set} containing the elements of this stream. There
+     * are no guarantees on the type, mutability, serializability, or thread-safety
+     * of the returned {@code Set}; if more control over the returned
+     * {@code Set} is required, use {@link #toCollection(Supplier)}.
      *
      * <p>
      * This is a terminal operation.
      *
      * @return a {@code Set} containing the elements of this stream
      * @see Collectors#toSet()
+     * @see #toMutableSet()
+     * @see #toImmutableSet()
      */
     public Set<T> toSet() {
+        return IMMUTABLE_TO_LIST ? toImmutableSet() : toMutableSet();
+    }
+
+    /**
+     * Returns a mutable {@link Set} containing the elements of this stream.
+     * There are no guarantees on the type, serializability, or thread-safety
+     * of the returned {@code Set}; if more control over the returned
+     * {@code Set} is required, use {@link #toCollection(Supplier)}.
+     *
+     * <p>
+     * This is a terminal operation.
+     *
+     * @return a {@code Set} containing the elements of this stream
+     * @see Collectors#toSet()
+     * @see #toImmutableSet()
+     * @since 0.8.0
+     */
+    public Set<T> toMutableSet() {
         return rawCollect(Collectors.toSet());
     }
 
@@ -1263,10 +1425,11 @@ public abstract class AbstractStreamEx<T, S extends AbstractStreamEx<T, S>> exte
      *
      * @return a {@code Set} containing the elements of this stream
      * @see #toSet()
+     * @see #toMutableSet()
      * @since 0.6.3
      */
     public Set<T> toImmutableSet() {
-        Set<T> result = toSet();
+        Set<T> result = toMutableSet();
         if (result.size() == 0)
             return Collections.emptySet();
         return Collections.unmodifiableSet(result);
@@ -1290,8 +1453,33 @@ public abstract class AbstractStreamEx<T, S extends AbstractStreamEx<T, S>> exte
      */
     public <R> R toSetAndThen(Function<? super Set<T>, R> finisher) {
         if (context.fjp != null)
-            return context.terminate(() -> finisher.apply(toSet()));
-        return finisher.apply(toSet());
+            return context.terminate(() -> finisher.apply(toMutableSet()));
+        return finisher.apply(toMutableSet());
+    }
+
+    /**
+     * Creates a custom {@link Collection} containing the elements of this stream, 
+     * then performs finishing transformation and returns its result. The
+     * {@code Collection} is created by the provided factory.
+     *
+     * <p>
+     * This is a terminal operation.
+     *
+     * @param <C> the type of the resulting {@code Collection}
+     * @param <R> the result type
+     * @param collectionFactory a {@code Supplier} which returns a new, empty
+     *        {@code Collection} of the appropriate type
+     * @param finisher a function to be applied to the intermediate {@code Collection}
+     * @return result of applying the finisher transformation to the {@code Collection}
+     *         of the stream elements.
+     * @since 0.7.3
+     * @see #toCollection(Supplier) 
+     */
+    public <C extends Collection<T>, R> R toCollectionAndThen(Supplier<C> collectionFactory, 
+                                                              Function<? super C, R> finisher) {
+        if (context.fjp != null)
+            return context.terminate(() -> finisher.apply(toCollection(collectionFactory)));
+        return finisher.apply(toCollection(collectionFactory));
     }
 
     /**
@@ -1306,6 +1494,7 @@ public abstract class AbstractStreamEx<T, S extends AbstractStreamEx<T, S>> exte
      *        {@code Collection} of the appropriate type
      * @return a {@code Collection} containing the elements of this stream
      * @see Collectors#toCollection(Supplier)
+     * @see #toCollectionAndThen(Supplier, Function) 
      */
     public <C extends Collection<T>> C toCollection(Supplier<C> collectionFactory) {
         return rawCollect(Collectors.toCollection(collectionFactory));
@@ -1330,7 +1519,7 @@ public abstract class AbstractStreamEx<T, S extends AbstractStreamEx<T, S>> exte
      * <p>
      * This method cannot take all the advantages of parallel streams as it must
      * process elements strictly left to right. If your accumulator function is
-     * associative and you can provide a combiner function, consider using
+     * associative, and you can provide a combiner function, consider using
      * {@link #reduce(Object, BiFunction, BinaryOperator)} method.
      *
      * <p>
@@ -1412,10 +1601,10 @@ public abstract class AbstractStreamEx<T, S extends AbstractStreamEx<T, S>> exte
      *
      * <p>
      * As this method must process elements strictly right to left, it cannot
-     * start processing till all the previous stream stages complete. Also it
+     * start processing till all the previous stream stages complete. Also, it
      * requires intermediate memory to store the whole content of the stream as
      * the stream natural order is left to right. If your accumulator function
-     * is associative and you can provide a combiner function, consider using
+     * is associative, and you can provide a combiner function, consider using
      * {@link #reduce(Object, BiFunction, BinaryOperator)} method.
      *
      * <p>
@@ -1452,7 +1641,7 @@ public abstract class AbstractStreamEx<T, S extends AbstractStreamEx<T, S>> exte
      *
      * <p>
      * As this method must process elements strictly right to left, it cannot
-     * start processing till all the previous stream stages complete. Also it
+     * start processing till all the previous stream stages complete. Also, it
      * requires intermediate memory to store the whole content of the stream as
      * the stream natural order is left to right. If your accumulator function
      * is associative, consider using {@link #reduce(BinaryOperator)} method.
@@ -1653,42 +1842,6 @@ public abstract class AbstractStreamEx<T, S extends AbstractStreamEx<T, S>> exte
     }
 
     /**
-     * Returns a stream consisting of the remaining elements of this stream
-     * after discarding the first {@code n} elements of the stream even if the
-     * stream is unordered. If this stream contains fewer than {@code n}
-     * elements then an empty stream will be returned.
-     *
-     * <p>
-     * This is a stateful <a
-     * href="package-summary.html#StreamOps">quasi-intermediate</a> operation.
-     * Unlike {@link #skip(long)} it skips the first elements even if the stream
-     * is unordered. The main purpose of this method is to workaround the
-     * problem of skipping the first elements from non-sized source with further
-     * parallel processing and unordered terminal operation (such as
-     * {@link #forEach(Consumer)}). For example,
-     * {@code StreamEx.ofLines(br).skip(1).parallel().toSet()} will skip
-     * arbitrary line, but
-     * {@code StreamEx.ofLines(br).skipOrdered(1).parallel().toSet()} will skip
-     * the first one. This problem was fixed in OracleJDK 8u60.
-     *
-     * <p>
-     * Also it behaves much better with infinite streams processed in parallel.
-     *
-     * <p>
-     * For sequential streams this method behaves exactly like
-     * {@link #skip(long)}.
-     *
-     * @param n the number of leading elements to skip
-     * @return the new stream
-     * @throws IllegalArgumentException if {@code n} is negative
-     * @see #skip(long)
-     * @since 0.3.2
-     */
-    public S skipOrdered(long n) {
-        return supply((isParallel() ? StreamSupport.stream(spliterator(), false) : stream()).skip(n).spliterator());
-    }
-
-    /**
      * Returns a stream consisting of all elements from this stream until the
      * first element which does not match the given predicate is found.
      *
@@ -1714,7 +1867,7 @@ public abstract class AbstractStreamEx<T, S extends AbstractStreamEx<T, S>> exte
      */
     public S takeWhile(Predicate<? super T> predicate) {
         Objects.requireNonNull(predicate);
-        return VER_SPEC.callWhile(this, predicate, false);
+        return VerSpec.VER_SPEC.callWhile(this, predicate, false);
     }
 
     /**
@@ -1771,7 +1924,7 @@ public abstract class AbstractStreamEx<T, S extends AbstractStreamEx<T, S>> exte
      */
     public S dropWhile(Predicate<? super T> predicate) {
         Objects.requireNonNull(predicate);
-        return VER_SPEC.callWhile(this, predicate, true);
+        return VerSpec.VER_SPEC.callWhile(this, predicate, true);
     }
 
     /**
@@ -1812,6 +1965,6 @@ public abstract class AbstractStreamEx<T, S extends AbstractStreamEx<T, S>> exte
     @SuppressWarnings("unchecked")
     @Override
     public <U> U chain(Function<? super S, U> mapper) {
-        return mapper.apply((S)this);
+        return mapper.apply((S) this);
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import java.util.Spliterator;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
-/* package */ class IfEmptySpliterator<T> extends StreamExInternals.CloneableSpliterator<T, IfEmptySpliterator<T>> {
+/* package */ class IfEmptySpliterator<T> extends Internals.CloneableSpliterator<T, IfEmptySpliterator<T>> {
     // alt == null --> decision is made
     private Spliterator<? extends T> spltr, alt;
     // positive = number of non-exhausted spliterators; negative = surely non-empty
@@ -106,7 +106,7 @@ import java.util.function.Consumer;
 
     @Override
     public int characteristics() {
-        if(alt == null) {
+        if (alt == null) {
             return spltr.characteristics() & (~SORTED);
         }
         return (spltr.characteristics() & alt.characteristics() & (~SORTED)) |

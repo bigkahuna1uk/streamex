@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,14 +16,20 @@
 
 package one.util.streamex;
 
-import static one.util.streamex.TestHelpers.*;
-import org.junit.Test;
-
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.function.Supplier;
+
+import org.junit.Test;
+
+import static one.util.streamex.TestHelpers.checkSpliterator;
+import static one.util.streamex.TestHelpers.consumeElement;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 public class IfEmptySpliteratorTest {
     @Test
@@ -33,6 +39,30 @@ public class IfEmptySpliteratorTest {
         checkSpliterator("-+", data, () -> new IfEmptySpliterator<>(Spliterators.emptySpliterator(), data.spliterator()));
         checkSpliterator("+-", data, () -> new IfEmptySpliterator<>(data.spliterator(), Spliterators.emptySpliterator()));
         checkSpliterator("--", Collections.emptyList(), () -> new IfEmptySpliterator<>(Spliterators.emptySpliterator(), Spliterators.emptySpliterator()));
+    }
+
+    @Test
+    public void testCharacteristics() {
+        Spliterator<String> sortedSpltr = StreamEx.of("foo", "bar", "baz").sorted().ifEmpty(
+            StreamEx.of("foo", "bar", "baz").sorted()).spliterator();
+        assertFalse(sortedSpltr.hasCharacteristics(Spliterator.SORTED));
+        consumeElement(sortedSpltr, "bar");
+        assertFalse(sortedSpltr.hasCharacteristics(Spliterator.SORTED));
+        assertTrue(StreamEx.of("foo", "bar", "baz").ifEmpty(StreamEx.of(new HashSet<>())).spliterator()
+                .hasCharacteristics(Spliterator.ORDERED));
+        List<String> list = Collections.singletonList("foo");
+        Spliterator<String> spliterator = StreamEx.<String>empty().ifEmpty(list.stream()).spliterator();
+        consumeElement(spliterator, "foo");
+        assertEquals(list.spliterator().characteristics(), spliterator.characteristics());
+    }
+
+    @Test
+    public void testSize() {
+        Spliterator<String> spliterator = StreamEx.of("foo", "bar", "baz").ifEmpty("qux").spliterator();
+        assertEquals(3, spliterator.getExactSizeIfKnown());
+        consumeElement(spliterator, "foo");
+        assertEquals(2, spliterator.getExactSizeIfKnown());
+        assertEquals(1, StreamEx.empty().ifEmpty("qux").spliterator().getExactSizeIfKnown());
     }
 
     @Test

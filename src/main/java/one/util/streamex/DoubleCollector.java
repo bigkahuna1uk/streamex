@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,16 +21,25 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalDouble;
 import java.util.function.BiConsumer;
+import java.util.function.DoubleBinaryOperator;
 import java.util.function.DoubleFunction;
 import java.util.function.DoublePredicate;
-import java.util.function.Function;
-import java.util.function.DoubleBinaryOperator;
 import java.util.function.DoubleUnaryOperator;
+import java.util.function.Function;
 import java.util.function.ObjDoubleConsumer;
 import java.util.function.Supplier;
 import java.util.stream.Collector;
 
-import static one.util.streamex.StreamExInternals.*;
+import static one.util.streamex.Internals.BooleanMap;
+import static one.util.streamex.Internals.Box;
+import static one.util.streamex.Internals.DoubleBuffer;
+import static one.util.streamex.Internals.DoubleCollectorImpl;
+import static one.util.streamex.Internals.FloatBuffer;
+import static one.util.streamex.Internals.ID_CHARACTERISTICS;
+import static one.util.streamex.Internals.NO_CHARACTERISTICS;
+import static one.util.streamex.Internals.PartialCollector;
+import static one.util.streamex.Internals.PrimitiveBox;
+import static one.util.streamex.Internals.UNBOX_DOUBLE;
 
 /**
  * A {@link Collector} specialized to work with primitive {@code double}.
@@ -53,7 +62,8 @@ public interface DoubleCollector<A, R> extends MergingCollector<Double, A, R> {
 
     /**
      * A function that folds a value into a mutable result container.
-     * 
+     *
+     * <p>
      * The default implementation calls {@link #doubleAccumulator()} on unboxed
      * value.
      *
@@ -148,7 +158,7 @@ public interface DoubleCollector<A, R> extends MergingCollector<Double, A, R> {
      */
     static DoubleCollector<?, String> joining(CharSequence delimiter, CharSequence prefix, CharSequence suffix) {
         return PartialCollector.joining(delimiter, prefix, suffix, true).asDouble(
-            StreamExInternals.joinAccumulatorDouble(delimiter));
+            Internals.joinAccumulatorDouble(delimiter));
     }
 
     /**
@@ -162,7 +172,7 @@ public interface DoubleCollector<A, R> extends MergingCollector<Double, A, R> {
      */
     static DoubleCollector<?, String> joining(CharSequence delimiter) {
         return PartialCollector.joining(delimiter, null, null, false).asDouble(
-            StreamExInternals.joinAccumulatorDouble(delimiter));
+            Internals.joinAccumulatorDouble(delimiter));
     }
 
     /**
@@ -336,6 +346,7 @@ public interface DoubleCollector<A, R> extends MergingCollector<Double, A, R> {
      * according to a {@code DoublePredicate}, and organizes them into a
      * {@code Map<Boolean, double[]>}.
      *
+     * <p>
      * There are no guarantees on the type, mutability, serializability, or
      * thread-safety of the {@code Map} returned.
      *

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -82,7 +82,7 @@ import java.util.stream.BaseStream;
 
     /**
      * {@inheritDoc}
-     * 
+     *
      * <p>
      * If this stream was created using {@link #parallel(ForkJoinPool)}, the new
      * stream forgets about supplied custom {@link ForkJoinPool} and its
@@ -104,7 +104,7 @@ import java.util.stream.BaseStream;
      * <p>
      * This is an <a href="package-summary.html#StreamOps">intermediate</a>
      * operation.
-     * 
+     *
      * <p>
      * The terminal operation of this stream or any derived stream (except the
      * streams created via {@link #parallel()} or {@link #sequential()} methods)
@@ -146,7 +146,7 @@ import java.util.stream.BaseStream;
     /**
      * Applies the supplied function to this stream and returns the result of
      * the function.
-     * 
+     *
      * <p>
      * This method can be used to add more functionality in the fluent style.
      * For example, consider user-defined static method
@@ -155,17 +155,17 @@ import java.util.stream.BaseStream;
      * {@code batches(StreamEx.of(input).map(...), 10).filter(...)}. Using the
      * {@code chain()} method you can write in more fluent manner:
      * {@code StreamEx.of(input).map(...).chain(s -> batches(s, 10)).filter(...)}.
-     * 
+     *
      * <p>
      * You could even go further and define a method which returns a function
      * like {@code <T> UnaryOperator<StreamEx<T>> batches(int n)} and use it
      * like this:
      * {@code StreamEx.of(input).map(...).chain(batches(10)).filter(...)}.
-     * 
-     * @param <U> the type of the function result.
+     *
+     * @param <U>    the type of the function result.
      * @param mapper function to invoke.
      * @return the result of the function invocation.
      * @since 0.5.4
      */
-    abstract public <U> U chain(Function<? super B, U> mapper);
+    public abstract <U> U chain(Function<? super B, U> mapper);
 }

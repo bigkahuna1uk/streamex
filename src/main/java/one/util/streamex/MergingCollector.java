@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,7 +46,8 @@ import java.util.stream.Collector;
     /**
      * A function that accepts two partial results and combines them returning
      * either existing partial result or new one.
-     * 
+     *
+     * <p>
      * The default implementation calls the {@link #merger()} and returns the
      * first partial result.
      *

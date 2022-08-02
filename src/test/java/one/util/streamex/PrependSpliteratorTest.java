@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,8 +21,10 @@ import java.util.stream.LongStream;
 
 import org.junit.Test;
 
-import static one.util.streamex.TestHelpers.*;
-import static org.junit.Assert.*;
+import static one.util.streamex.TestHelpers.checkSpliterator;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 /**
  * @author Tagir Valeev
@@ -48,7 +50,7 @@ public class PrependSpliteratorTest {
                 .estimateSize());
         
         PrependSpliterator<Integer> spltr = new PrependSpliterator<>(IntStream.range(1, 100).spliterator(), 0);
-        spltr.tryAdvance(x -> assertEquals(0, (int)x));
+        spltr.tryAdvance(x -> assertEquals(0, (int) x));
         assertTrue(spltr.hasCharacteristics(Spliterator.SORTED));
     }
 }

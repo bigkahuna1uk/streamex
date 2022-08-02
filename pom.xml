@@ -1,5 +1,5 @@
 <!--
-  ~ Copyright 2015, 2017 StreamEx contributors
+  ~ Copyright 2015, 2019 StreamEx contributors
   ~
   ~ Licensed under the Apache License, Version 2.0 (the "License");
   ~ you may not use this file except in compliance with the License.
@@ -20,16 +20,30 @@
 
   <groupId>one.util</groupId>
   <artifactId>streamex</artifactId>
-  <version>0.6.8-SNAPSHOT</version>
+  <version>0.8.2-SNAPSHOT</version>
   <packaging>jar</packaging>
 
   <name>StreamEx</name>
   <description>Enhancing Java 8 Streams</description>
   <url>https://github.com/amaembo/streamex</url>
+  <inceptionYear>2015</inceptionYear>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.package>one.util.streamex</project.package>
+    <project.package.path>one/util/streamex</project.package.path>
+    <project.github.repository>amaembo/streamex</project.github.repository>
+    <repository.url>git@github.com:${project.github.repository}.git</repository.url>
+    <nexus.url>https://oss.sonatype.org</nexus.url>
+    <license.url>https://www.apache.org/licenses/LICENSE-2.0</license.url>
+    <maven.compiler.source>1.8</maven.compiler.source>
+    <maven.compiler.target>1.8</maven.compiler.target>
+  </properties>
+
   <licenses>
     <license>
       <name>Apache License, Version 2.0</name>
-      <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+      <url>${license.url}</url>
       <distribution>repo</distribution>
     </license>
   </licenses>
@@ -37,21 +51,19 @@
   <distributionManagement>
     <snapshotRepository>
       <id>ossrh</id>
-      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+      <url>${nexus.url}/content/repositories/snapshots</url>
     </snapshotRepository>
+    <repository>
+      <id>ossrh</id>
+      <url>${nexus.url}/service/local/staging/deploy/maven2/</url>
+    </repository>
   </distributionManagement>
-
-  <properties>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <project.package>one.util.streamex</project.package>
-    <project.package.path>one/util/streamex</project.package.path>
-  </properties>
 
   <dependencies>
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
-      <version>4.12</version>
+      <version>4.13.2</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
@@ -67,20 +79,75 @@
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <version>3.0.0-M2</version>
+        <executions>
+          <execution>
+            <id>enforce-java</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requireJavaVersion>
+                  <version>11</version>
+                </requireJavaVersion>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <version>3.0.0</version>
+        <executions>
+          <execution>
+            <phase>test</phase>
+            <goals>
+              <goal>add-source</goal>
+            </goals>
+            <configuration>
+              <!-- Necessary to add sources to the source-jar -->
+              <sources>
+                <source>src/main/java-mr/9</source>
+              </sources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.3</version>
+        <version>3.8.1</version>
         <configuration>
-          <source>1.8</source>
-          <target>1.8</target>
+          <!-- javadoc plugin uses this to detect JDK URL -->
+          <source>${maven.compiler.source}</source>
+          <release>8</release>
           <compilerArgs>
             <arg>-Xlint:all</arg>
           </compilerArgs>
         </configuration>
+        <executions>
+          <execution>
+            <id>java9</id>
+            <goals>
+              <goal>compile</goal>
+            </goals>
+            <configuration>
+              <release>9</release>
+              <multiReleaseOutput>true</multiReleaseOutput>
+              <compileSourceRoots>
+                <compileSourceRoot>${project.basedir}/src/main/java-mr/9</compileSourceRoot>
+              </compileSourceRoots>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-javadoc-plugin</artifactId>
-        <version>3.0.0</version>
+        <version>3.0.1</version>
         <executions>
           <execution>
             <!-- This execution used just to run javadoc with doclint and 
@@ -102,9 +169,9 @@
               <goal>jar</goal>
             </goals>
             <configuration>
-              <sourcepath>${project.build.sourceDirectory};${project.build.directory}/jdk</sourcepath>
+              <sourcepath>${project.build.sourceDirectory};${project.basedir}/src/main/java-mr/9;${project.build.directory}/jdk</sourcepath>
               <excludePackageNames>java.util.stream</excludePackageNames>
-              <additionalOptions>-Xdoclint:none</additionalOptions>
+              <additionalOptions>-Xdoclint:all</additionalOptions>
               <noqualifier>all</noqualifier>
               <quiet>true</quiet>
             </configuration>
@@ -115,6 +182,14 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-antrun-plugin</artifactId>
         <version>1.8</version>
+        <dependencies>
+          <dependency>
+            <groupId>org.jacoco</groupId>
+            <artifactId>org.jacoco.ant</artifactId>
+            <classifier>nodeps</classifier>
+            <version>0.8.5</version>
+          </dependency>
+        </dependencies>
         <executions>
           <execution>
             <!-- Unpack java.util.stream package from JDK source to inherit 
@@ -151,19 +226,63 @@
                 <property name="token.SpliteratorT"><![CDATA[Spliterator&lt;T&gt;]]></property>
                 <property name="token.SpliteratorKV"><![CDATA[Spliterator&lt;Map.Entry&lt;K, V&gt;&gt;]]></property>
                 <replace
-                  file="${project.build.directory}/apidocs/${project.package.path}/EntryStream.html"
+                  file="${project.build.directory}/apidocs/${project.package}/${project.package.path}/EntryStream.html"
                   token="${token.SPLTR}" value="${token.SpliteratorKV}" />
                 <replace
-                  file="${project.build.directory}/apidocs/${project.package.path}/StreamEx.html"
+                  file="${project.build.directory}/apidocs/${project.package}/${project.package.path}/StreamEx.html"
                   token="${token.SPLTR}" value="${token.SpliteratorT}" />
                 <jar
                   destfile="${project.build.directory}/${project.build.finalName}-javadoc.jar"
                   update="true">
                   <fileset dir="${project.build.directory}/apidocs"
-                    includes="${project.package.path}/EntryStream.html" />
+                    includes="${project.package}/${project.package.path}/EntryStream.html" />
                   <fileset dir="${project.build.directory}/apidocs"
-                    includes="${project.package.path}/StreamEx.html" />
+                    includes="${project.package}/${project.package.path}/StreamEx.html" />
                 </jar>
+              </target>
+            </configuration>
+            <goals>
+              <goal>run</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>jacoco-report</id>
+            <phase>prepare-package</phase>
+            <configuration>
+              <target>
+                <typedef resource="org/jacoco/ant/antlib.xml"/>
+                <report>
+                  <executiondata>
+                    <fileset dir="target" includes="jacoco.exec"/>
+                  </executiondata>
+                  <structure name="${project.name}">
+                    <group name="src/main/java">
+                      <classfiles>
+                        <fileset dir="${basedir}/target/classes">
+                          <exclude name="META-INF/versions/**"/>
+                        </fileset>
+                      </classfiles>
+                      <sourcefiles>
+                        <fileset dir="${basedir}/src/main/java"/>
+                      </sourcefiles>
+                    </group>
+                    <group name="src/main/java-mr/9">
+                      <classfiles>
+                        <fileset dir="${basedir}/target/classes/META-INF/versions/9"/>
+                      </classfiles>
+                      <sourcefiles>
+                        <fileset dir="${basedir}/src/main/java-mr/9"/>
+                      </sourcefiles>
+                    </group>
+                  </structure>
+                  <html destdir="${basedir}/target/site/jacoco"/>
+                  <xml destfile="${basedir}/target/site/jacoco/jacoco.xml"/>
+                  <check>
+                    <rule element="BUNDLE">
+                      <limit counter="COMPLEXITY" value="COVEREDRATIO" minimum="0.95"/>
+                    </rule>
+                  </check>
+                </report>
               </target>
             </configuration>
             <goals>
@@ -186,35 +305,21 @@
         </executions>
       </plugin>
       <plugin>
-        <groupId>org.apache.felix</groupId>
-        <artifactId>maven-bundle-plugin</artifactId>
-        <version>2.4.0</version>
-        <extensions>true</extensions>
-        <executions>
-          <execution>
-            <id>bundle-manifest</id>
-            <phase>process-classes</phase>
-            <goals>
-              <goal>manifest</goal>
-            </goals>
-          </execution>
-        </executions>
-        <configuration>
-          <instructions>
-            <Bundle-SymbolicName>${project.package}</Bundle-SymbolicName>
-            <Bundle-Name>${project.name}</Bundle-Name>
-            <Export-Package>${project.package}</Export-Package>
-            <Automatic-Module-Name>${project.package}</Automatic-Module-Name>
-          </instructions>
-        </configuration>
-      </plugin>
-      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
         <version>2.4</version>
         <configuration>
           <archive>
-            <manifestFile>${project.build.outputDirectory}/META-INF/MANIFEST.MF</manifestFile>
+            <manifestEntries>
+              <Bundle-Name>${project.name}</Bundle-Name>
+              <Bundle-Description>${project.description}</Bundle-Description>
+              <Bundle-License>${license.url}</Bundle-License>
+              <Bundle-ManifestVersion>2</Bundle-ManifestVersion>
+              <Bundle-SymbolicName>${project.package}</Bundle-SymbolicName>
+              <Bundle-Version>${project.version}</Bundle-Version>
+              <Export-Package>${project.package};version="${project.version}"</Export-Package>
+              <Multi-Release>true</Multi-Release>
+            </manifestEntries>
           </archive>
         </configuration>
       </plugin>
@@ -225,14 +330,14 @@
         <extensions>true</extensions>
         <configuration>
           <serverId>ossrh</serverId>
-          <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+          <nexusUrl>${nexus.url}</nexusUrl>
           <autoReleaseAfterClose>true</autoReleaseAfterClose>
         </configuration>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-gpg-plugin</artifactId>
-        <version>1.5</version>
+        <version>1.6</version>
         <executions>
           <execution>
             <id>sign-artifacts</id>
@@ -244,9 +349,35 @@
         </executions>
       </plugin>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.0.0-M3</version>
+        <configuration>
+          <useModulePath>false</useModulePath>
+        </configuration>
+        <executions>
+          <execution>
+            <id>default-test</id>
+            <configuration>
+              <classesDirectory>${basedir}/target/classes/META-INF/versions/9</classesDirectory>
+              <additionalClasspathElements>${project.build.outputDirectory}</additionalClasspathElements>
+            </configuration>
+            <goals>
+              <goal>test</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>java8-test</id>
+            <goals>
+              <goal>test</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
-        <version>0.8.1</version>
+        <version>0.8.7</version>
         <executions>
           <execution>
             <id>default-prepare-agent</id>
@@ -254,46 +385,67 @@
               <goal>prepare-agent</goal>
             </goals>
           </execution>
-          <execution>
-            <id>default-report</id>
-            <phase>prepare-package</phase>
-            <goals>
-              <goal>report</goal>
-            </goals>
-          </execution>
-          <execution>
-            <id>default-check</id>
-            <goals>
-              <goal>check</goal>
-            </goals>
-            <configuration>
-              <rules>
-                <rule implementation="org.jacoco.maven.RuleConfiguration">
-                  <element>BUNDLE</element>
-                  <limits>
-                    <limit implementation="org.jacoco.report.check.Limit">
-                      <counter>COMPLEXITY</counter>
-                      <value>COVEREDRATIO</value>
-                      <minimum>0.90</minimum>
-                    </limit>
-                  </limits>
-                </rule>
-              </rules>
-            </configuration>
-          </execution>
         </executions>
       </plugin>
       <plugin>
         <groupId>org.eluder.coveralls</groupId>
         <artifactId>coveralls-maven-plugin</artifactId>
-        <version>4.0.0</version>
+        <version>4.3.0</version>
+        <dependencies>
+          <dependency>
+            <groupId>javax.xml.bind</groupId>
+            <artifactId>jaxb-api</artifactId>
+            <version>2.2.3</version>
+          </dependency>
+        </dependencies>
+      </plugin>
+      <plugin>
+        <groupId>org.jreleaser</groupId>
+        <artifactId>jreleaser-maven-plugin</artifactId>
+        <version>0.9.1</version>
+        <configuration>
+          <jreleaser>
+            <project>
+              <license>Apache-2.0</license> <!-- SPDX identifier -->
+            </project>
+            <release>
+              <github>
+                <tagName>streamex-{{projectVersion}}</tagName>
+                <branch>master</branch>
+                <changelog>
+                  <formatted>ALWAYS</formatted>
+                  <format>- {{commitShortHash}} {{commitTitle}}</format>
+                  <contributors>
+                    <format>- {{contributorName}}{{#contributorUsernameAsLink}} ({{.}}){{/contributorUsernameAsLink}}</format>
+                  </contributors>
+                  <hide>
+                    <contributors>GitHub</contributors>
+                  </hide>
+                </changelog>
+              </github>
+            </release>
+            <files>
+              <artifacts>
+                <artifact>
+                  <path>${project.build.directory}/${project.artifactId}-${project.version}.jar</path>
+                </artifact>
+                <artifact>
+                  <path>${project.build.directory}/${project.artifactId}-${project.version}-sources.jar</path>
+                </artifact>
+                <artifact>
+                  <path>${project.build.directory}/${project.artifactId}-${project.version}-javadoc.jar</path>
+                </artifact>
+              </artifacts>
+            </files>
+          </jreleaser>
+        </configuration>
       </plugin>
     </plugins>
   </build>
 
   <scm>
-    <connection>scm:git:https://github.com/amaembo/streamex.git</connection>
-    <developerConnection>scm:git:https://github.com/amaembo/streamex.git</developerConnection>
-    <url>https://github.com/amaembo/streamex.git</url>
+    <connection>scm:git:${repository.url}</connection>
+    <developerConnection>scm:git:${repository.url}</developerConnection>
+    <url>${repository.url}</url>
   </scm>
 </project>

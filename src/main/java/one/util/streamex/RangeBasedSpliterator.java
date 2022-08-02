@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,8 @@ import java.util.function.IntConsumer;
 import java.util.function.LongBinaryOperator;
 import java.util.function.LongConsumer;
 
-import static one.util.streamex.StreamExInternals.*;
+import static one.util.streamex.Internals.CloneableSpliterator;
+import static one.util.streamex.Internals.ObjIntBox;
 
 /**
  * @author Tagir Valeev

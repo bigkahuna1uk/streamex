@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package one.util.streamex;
 import java.util.Spliterator;
 import java.util.function.Consumer;
 
-import one.util.streamex.StreamExInternals.TailSpliterator;
+import one.util.streamex.Internals.TailSpliterator;
 
 /**
  * @author Tagir Valeev
@@ -33,7 +33,7 @@ import one.util.streamex.StreamExInternals.TailSpliterator;
     public PrependSpliterator(Spliterator<T> source, T element) {
         this.source = source;
         this.element = element;
-        this.mode = source.estimateSize() < Long.MAX_VALUE-1 ? 1 : 2;
+        this.mode = source.estimateSize() < Long.MAX_VALUE - 1 ? 1 : 2;
     }
 
     @Override
@@ -96,7 +96,7 @@ import one.util.streamex.StreamExInternals.TailSpliterator;
 
     @Override
     public int characteristics() {
-        switch(mode) {
+        switch (mode) {
         case 1:
             return source.characteristics() & (ORDERED | SIZED | SUBSIZED);
         case 2:

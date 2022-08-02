@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,6 +31,7 @@ import java.util.function.Consumer;
         this.fence = fence;
         this.value = value;
     }
+
     @Override
     public void forEachRemaining(Consumer<? super int[]> action) {
         long rest = pos - fence;

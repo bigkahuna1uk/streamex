@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,9 +15,23 @@
  */
 package one.util.streamex;
 
-import java.util.*;
 import java.util.AbstractMap.SimpleImmutableEntry;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.NavigableMap;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.SortedMap;
+import java.util.Spliterator;
+import java.util.Spliterators;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -27,6 +41,7 @@ import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.IntPredicate;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collector;
@@ -35,7 +50,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-import static one.util.streamex.StreamExInternals.*;
+import static one.util.streamex.Internals.PairBox;
+import static one.util.streamex.Internals.checkLength;
 
 /**
  * A {@link Stream} of {@link Entry} objects which provides additional specific
@@ -52,7 +68,7 @@ import static one.util.streamex.StreamExInternals.*;
  * @param <K> the type of {@code Entry} keys
  * @param <V> the type of {@code Entry} values
  */
-public class EntryStream<K, V> extends AbstractStreamEx<Entry<K, V>, EntryStream<K, V>> {
+public final class EntryStream<K, V> extends AbstractStreamEx<Entry<K, V>, EntryStream<K, V>> {
     EntryStream(Stream<? extends Entry<K, V>> stream, StreamContext context) {
         super(stream, context);
     }
@@ -253,7 +269,7 @@ public class EntryStream<K, V> extends AbstractStreamEx<Entry<K, V>, EntryStream
      * @since 0.3.0
      */
     public <R> StreamEx<R> flatMapKeyValue(BiFunction<? super K, ? super V, ? extends Stream<? extends R>> mapper) {
-        return this.<R> flatMap(toFunction(mapper));
+        return this.<R>flatMap(toFunction(mapper));
     }
 
     /**
@@ -516,7 +532,7 @@ public class EntryStream<K, V> extends AbstractStreamEx<Entry<K, V>, EntryStream
      * @return the new stream
      */
     public <R> StreamEx<R> mapKeyValue(BiFunction<? super K, ? super V, ? extends R> mapper) {
-        return this.<R> map(toFunction(mapper));
+        return this.<R>map(toFunction(mapper));
     }
 
     /**
@@ -549,7 +565,7 @@ public class EntryStream<K, V> extends AbstractStreamEx<Entry<K, V>, EntryStream
     public <R> StreamEx<R> mapKeyValuePartial(
             BiFunction<? super K, ? super V, ? extends Optional<? extends R>> mapper
     ) {
-        return mapPartial(toFunction(mapper));
+        return this.<R>mapPartial(toFunction(mapper));
     }
 
     /**
@@ -689,6 +705,11 @@ public class EntryStream<K, V> extends AbstractStreamEx<Entry<K, V>, EntryStream
      * @param keyPredicate a non-interfering, stateless predicate to apply to
      *        the key of each element to determine if it should be included
      * @return the new stream
+     * @see #nonNull()
+     * @see #filter(Predicate)
+     * @see #remove(Predicate)
+     * @see #selectKeys(Class)
+     * @see #selectValues(Class)
      */
     public EntryStream<K, V> filterKeys(Predicate<? super K> keyPredicate) {
         return filter(e -> keyPredicate.test(e.getKey()));
@@ -705,6 +726,11 @@ public class EntryStream<K, V> extends AbstractStreamEx<Entry<K, V>, EntryStream
      * @param valuePredicate a non-interfering, stateless predicate to apply to
      *        the value of each element to determine if it should be included
      * @return the new stream
+     * @see #nonNull()
+     * @see #filter(Predicate)
+     * @see #remove(Predicate)
+     * @see #selectKeys(Class)
+     * @see #selectValues(Class)
      */
     public EntryStream<K, V> filterValues(Predicate<? super V> valuePredicate) {
         return filter(e -> valuePredicate.test(e.getValue()));
@@ -723,9 +749,73 @@ public class EntryStream<K, V> extends AbstractStreamEx<Entry<K, V>, EntryStream
      *        included
      * @return the new stream
      * @since 0.3.0
+     * @see #nonNull()
+     * @see #filter(Predicate)
+     * @see #remove(Predicate)
+     * @see #selectKeys(Class)
+     * @see #selectValues(Class)
      */
     public EntryStream<K, V> filterKeyValue(BiPredicate<? super K, ? super V> predicate) {
         return filter(e -> predicate.test(e.getKey(), e.getValue()));
+    }
+
+    /**
+     * Returns whether any elements of this stream match the provided
+     * predicate. If the stream is empty then {@code false} is returned
+     * and the predicate is not evaluated.
+     *
+     * <p>
+     * This is a <a href="package-summary.html#StreamOps">terminal</a>
+     * operation.
+     *
+     * @param predicate a non-interfering, stateless predicate to apply
+     *        to elements of this stream
+     * @return {@code true} if any elements of the stream match the provided
+     *         predicate, otherwise {@code false}
+     * @since 0.7.0
+     */
+    public boolean anyMatch(BiPredicate<? super K, ? super V> predicate) {
+        return anyMatch(e -> predicate.test(e.getKey(), e.getValue()));
+    }
+
+    /**
+     * Returns whether all elements of this stream match the provided
+     * predicate. If the stream is empty then {@code true} is returned
+     * and the predicate is not evaluated.
+     *
+     * <p>
+     * This is a <a href="package-summary.html#StreamOps">terminal</a>
+     * operation.
+     *
+     * @param predicate a non-interfering, stateless predicate to apply
+     *        to elements of this stream
+     * @return {@code true} if either all elements of the stream match the
+     *         provided predicate or the stream is empty,
+     *         otherwise {@code false}
+     * @since 0.7.0
+     */
+    public boolean allMatch(BiPredicate<? super K, ? super V> predicate) {
+        return allMatch(e -> predicate.test(e.getKey(), e.getValue()));
+    }
+
+    /**
+     * Returns whether no elements of this stream match the provided
+     * predicate. If the stream is empty then {@code true} is returned
+     * and the predicate is not evaluated.
+     *
+     * <p>
+     * This is a <a href="package-summary.html#StreamOps">terminal</a>
+     * operation.
+     *
+     * @param predicate a non-interfering, stateless predicate to apply
+     *        to elements of this stream
+     * @return {@code true} if either no elements of the stream match the
+     *         provided predicate or the stream is empty,
+     *         otherwise {@code false}
+     * @since 0.7.0
+     */
+    public boolean noneMatch(BiPredicate<? super K, ? super V> predicate) {
+        return noneMatch(e -> predicate.test(e.getKey(), e.getValue()));
     }
 
     /**
@@ -739,6 +829,11 @@ public class EntryStream<K, V> extends AbstractStreamEx<Entry<K, V>, EntryStream
      * @param keyPredicate a non-interfering, stateless predicate to apply to
      *        the key of each element to determine if it should be excluded
      * @return the new stream
+     * @see #nonNull()
+     * @see #filter(Predicate)
+     * @see #remove(Predicate)
+     * @see #selectKeys(Class)
+     * @see #selectValues(Class)
      */
     public EntryStream<K, V> removeKeys(Predicate<? super K> keyPredicate) {
         return filterKeys(keyPredicate.negate());
@@ -755,6 +850,11 @@ public class EntryStream<K, V> extends AbstractStreamEx<Entry<K, V>, EntryStream
      * @param valuePredicate a non-interfering, stateless predicate to apply to
      *        the value of each element to determine if it should be excluded
      * @return the new stream
+     * @see #nonNull()
+     * @see #filter(Predicate)
+     * @see #remove(Predicate)
+     * @see #selectKeys(Class)
+     * @see #selectValues(Class)
      */
     public EntryStream<K, V> removeValues(Predicate<? super V> valuePredicate) {
         return filterValues(valuePredicate.negate());
@@ -773,6 +873,11 @@ public class EntryStream<K, V> extends AbstractStreamEx<Entry<K, V>, EntryStream
      *        excluded
      * @return the new stream
      * @since 0.6.0
+     * @see #nonNull()
+     * @see #filter(Predicate)
+     * @see #remove(Predicate)
+     * @see #selectKeys(Class)
+     * @see #selectValues(Class)
      */
     public EntryStream<K, V> removeKeyValue(BiPredicate<? super K, ? super V> predicate) {
         return filterKeyValue(predicate.negate());
@@ -787,6 +892,11 @@ public class EntryStream<K, V> extends AbstractStreamEx<Entry<K, V>, EntryStream
      * operation.
      *
      * @return the new stream
+     * @see #nonNull()
+     * @see #filter(Predicate)
+     * @see #remove(Predicate)
+     * @see #selectKeys(Class)
+     * @see #selectValues(Class)
      */
     public EntryStream<K, V> nonNullKeys() {
         return filter(e -> e.getKey() != null);
@@ -801,6 +911,11 @@ public class EntryStream<K, V> extends AbstractStreamEx<Entry<K, V>, EntryStream
      * operation.
      *
      * @return the new stream
+     * @see #nonNull()
+     * @see #filter(Predicate)
+     * @see #remove(Predicate)
+     * @see #selectKeys(Class)
+     * @see #selectValues(Class)
      */
     public EntryStream<K, V> nonNullValues() {
         return filter(e -> e.getValue() != null);
@@ -817,6 +932,10 @@ public class EntryStream<K, V> extends AbstractStreamEx<Entry<K, V>, EntryStream
      * @param <KK> a type of keys to select.
      * @param clazz a class to filter the keys.
      * @return the new stream
+     * @see #nonNull()
+     * @see #filter(Predicate)
+     * @see #remove(Predicate)
+     * @see #selectValues(Class)
      */
     @SuppressWarnings({ "unchecked" })
     public <KK> EntryStream<KK, V> selectKeys(Class<KK> clazz) {
@@ -834,6 +953,10 @@ public class EntryStream<K, V> extends AbstractStreamEx<Entry<K, V>, EntryStream
      * @param <VV> a type of values to select.
      * @param clazz a class to filter the values.
      * @return the new stream
+     * @see #nonNull()
+     * @see #filter(Predicate)
+     * @see #remove(Predicate)
+     * @see #selectKeys(Class)
      */
     @SuppressWarnings({ "unchecked" })
     public <VV> EntryStream<K, VV> selectValues(Class<VV> clazz) {
@@ -939,6 +1062,20 @@ public class EntryStream<K, V> extends AbstractStreamEx<Entry<K, V>, EntryStream
     }
 
     /**
+     * {@inheritDoc}
+     *
+     * <p>
+     * This method is unlikely to work on {@code EntryStream}, because {@link Map.Entry} instances rarely implement
+     * the {@link Comparable} interface. If you want to sort the stream by Map keys use 
+     * {@code sorted(Map.Entry.comparingByKey())} or {@code sortedBy(Map.Entry::getKey)}. If you want to sort the 
+     * stream by Map values use {@code sorted(Map.Entry.comparingByValue())} or {@code sortedBy(Map.Entry::getValue)}.
+     */
+    @Override
+    public EntryStream<K, V> sorted() {
+        return super.sorted();
+    }
+
+    /**
      * Merge series of adjacent stream entries with equal keys grouping the
      * corresponding values into {@code List}.
      *
@@ -960,24 +1097,24 @@ public class EntryStream<K, V> extends AbstractStreamEx<Entry<K, V>, EntryStream
      * @since 0.5.5
      */
     public EntryStream<K, List<V>> collapseKeys() {
-        return new StreamEx<>(new CollapseSpliterator<Entry<K, V>, PairBox<K, List<V>>>(equalKeys(),
+        return new StreamEx<>(new CollapseSpliterator<>(equalKeys(),
                 e -> new PairBox<>(e.getKey(), Collections.singletonList(e.getValue())), (pb, e) -> {
-                    if (!(pb.b instanceof ArrayList)) {
-                        V old = pb.b.get(0);
-                        pb.b = new ArrayList<>();
-                        pb.b.add(old);
-                    }
-                    pb.b.add(e.getValue());
-                    return pb;
-                }, (pb1, pb2) -> {
-                    if (!(pb1.b instanceof ArrayList)) {
-                        V old = pb1.b.get(0);
-                        pb1.b = new ArrayList<>();
-                        pb1.b.add(old);
-                    }
-                    pb1.b.addAll(pb2.b);
-                    return pb1;
-                }, spliterator()), context).mapToEntry(pb -> pb.a, pb -> pb.b);
+            if (!(pb.b instanceof ArrayList)) {
+                V old = pb.b.get(0);
+                pb.b = new ArrayList<>();
+                pb.b.add(old);
+            }
+            pb.b.add(e.getValue());
+            return pb;
+        }, (pb1, pb2) -> {
+            if (!(pb1.b instanceof ArrayList)) {
+                V old = pb1.b.get(0);
+                pb1.b = new ArrayList<>();
+                pb1.b.add(old);
+            }
+            pb1.b.addAll(pb2.b);
+            return pb1;
+        }, spliterator()), context).mapToEntry(pb -> pb.a, pb -> pb.b);
     }
 
     /**
@@ -1033,7 +1170,7 @@ public class EntryStream<K, V> extends AbstractStreamEx<Entry<K, V>, EntryStream
         BiConsumer<A, ? super V> accumulator = collector.accumulator();
         BinaryOperator<A> combiner = collector.combiner();
         Function<A, R> finisher = collector.finisher();
-        return new StreamEx<>(new CollapseSpliterator<Entry<K, V>, PairBox<K, A>>(equalKeys(), e -> {
+        return new StreamEx<>(new CollapseSpliterator<>(equalKeys(), e -> {
             A a = supplier.get();
             accumulator.accept(a, e.getValue());
             return new PairBox<>(e.getKey(), a);
@@ -1590,7 +1727,7 @@ public class EntryStream<K, V> extends AbstractStreamEx<Entry<K, V>, EntryStream
      * operation.
      *
      * <p>
-     * The behavior of this operation is explicitly nondeterministic. For
+     * The behavior of this operation is explicitly non-deterministic. For
      * parallel stream pipelines, this operation does <em>not</em> guarantee to
      * respect the encounter order of the stream, as doing so would sacrifice
      * the benefit of parallelism. For any given element, the action may be
@@ -2089,8 +2226,8 @@ public class EntryStream<K, V> extends AbstractStreamEx<Entry<K, V>, EntryStream
      * @see #ofTree(Object, Class, BiFunction)
      */
     public static <T> EntryStream<Integer, T> ofTree(T root, BiFunction<Integer, T, Stream<T>> mapper) {
-        TreeSpliterator<T, Entry<Integer, T>> spliterator = new TreeSpliterator.Depth<>(root, mapper);
-        return new EntryStream<>(spliterator, StreamContext.SEQUENTIAL.onClose(spliterator::close));
+        TreeSpliterator<T, Entry<Integer, T>> spliterator = new TreeSpliterator.Depth<>(root, mapper, 0);
+        return new EntryStream<>(spliterator, StreamContext.SEQUENTIAL.onClose(spliterator));
     }
 
     /**
@@ -2148,4 +2285,87 @@ public class EntryStream<K, V> extends AbstractStreamEx<Entry<K, V>, EntryStream
                 Stream.generate(() -> new SimpleImmutableEntry<>(keySupplier.get(), valueSupplier.get())),
                 StreamContext.SEQUENTIAL);
     }
+
+    /**
+     * Returns an {@code EntryStream} consisting of the elements of this stream
+     * whose keys are not equal to any of supplied keys.
+     *
+     * <p>
+     * This is an <a href="package-summary.html#StreamOps">intermediate</a> operation.
+     * May return itself if no keys were supplied.
+     *
+     * <p>
+     * Current implementation scans the supplied keys linearly for every stream element.
+     * If you have many keys, consider using more efficient alternative instead.
+     *
+     * <p>
+     * Future implementations may take advantage on using {@code hashCode()} or
+     * {@code compareTo} for {@code Comparable} objects to improve the performance.
+     *
+     * <p>
+     * If the {@code keys} array is changed between calling this method and finishing the stream traversal,
+     * then the result of the stream traversal is undefined: changes may or may not be taken into account.
+     *
+     * @param keys the keys to remove from the stream.
+     * @return the new stream
+     * @since 0.8.0
+     * @see #withoutValues(Object...)
+     * @see StreamEx#without(Object...)
+     */
+    @SafeVarargs
+    public final EntryStream<K, V> withoutKeys(K... keys) {
+        if (keys.length == 0)
+            return this;
+        if (keys.length == 1)
+            return filter(entry -> !entry.getKey().equals(keys[0]));
+        return filter(entry -> {
+            for (K key : keys) {
+                if (entry.getKey().equals(key))
+                    return false;
+            }
+            return true;
+        });
+    }
+
+    /**
+     * Returns an {@code EntryStream} consisting of the elements of this stream
+     * whose values are not equal to any of the supplied values.
+     *
+     * <p>
+     * This is an <a href="package-summary.html#StreamOps">intermediate</a> operation.
+     * May return itself if no values were supplied.
+     *
+     * <p>
+     * Current implementation scans the supplied values linearly for every stream element.
+     * If you have many values, consider using more efficient alternative instead.
+     *
+     * <p>
+     * Future implementations may take advantage on using {@code hashCode()} or
+     * {@code compareTo} for {@code Comparable} objects to improve the performance.
+     *
+     * <p>
+     * If the {@code values} array is changed between calling this method and finishing the stream traversal,
+     * then the result of the stream traversal is undefined: changes may or may not be taken into account.
+     *
+     * @param values the values to remove from the stream.
+     * @return the new stream
+     * @since 0.8.0
+     * @see #withoutKeys(Object...)
+     * @see StreamEx#without(Object...)
+     */
+    @SafeVarargs
+    public final EntryStream<K, V> withoutValues(V... values) {
+        if (values.length == 0)
+            return this;
+        if (values.length == 1)
+            return filter(entry -> !entry.getValue().equals(values[0]));
+        return filter(entry -> {
+            for (V value : values) {
+                if (entry.getValue().equals(value))
+                    return false;
+            }
+            return true;
+        });
+    }
+
 }

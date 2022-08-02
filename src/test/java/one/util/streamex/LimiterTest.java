@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
@@ -26,7 +27,7 @@ import java.util.stream.IntStream;
 
 import org.junit.Test;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 /**
  * @author Tagir Valeev
@@ -54,9 +55,9 @@ public class LimiterTest {
         List<Integer> list = IntStreamEx.range(100000).boxed().toList();
         exerciseLimiter("big", list, list, 50000, Comparator.naturalOrder()); 
         exerciseLimiter("big", list, list, 49999, Comparator.naturalOrder()); 
-        exerciseLimiter("big", list, list, 10000, Comparator.naturalOrder()); 
-        exerciseLimiter("big", list, list, Integer.MAX_VALUE/3, Comparator.naturalOrder()); 
-        exerciseLimiter("big", list, list, Integer.MAX_VALUE/2, Comparator.naturalOrder()); 
+        exerciseLimiter("big", list, list, 10000, Comparator.naturalOrder());
+        exerciseLimiter("big", list, list, Integer.MAX_VALUE / 3, Comparator.naturalOrder());
+        exerciseLimiter("big", list, list, Integer.MAX_VALUE / 2, Comparator.naturalOrder());
     }
 
     public static <T> void exerciseLimiter(String msg, Collection<T> input, Comparator<T> comp) {
@@ -74,4 +75,20 @@ public class LimiterTest {
         actual = input.parallelStream().collect(MoreCollectors.least(comp, limit));
         assertEquals("Mismatch (parallel), " + msg + ", limit=" + limit, subList, actual);
     }
+    
+    @Test
+    public void testDirect() {
+        Limiter<Integer> limiter = new Limiter<>(5, Comparator.naturalOrder());
+        limiter.put(1);
+        limiter.put(2);
+        limiter.put(3);
+        limiter.put(4);
+        assertEquals(4, limiter.size());
+        limiter.put(5);
+        assertEquals(5, limiter.size());
+        limiter.put(6);
+        assertEquals(5, limiter.size());
+        Iterator<Integer> iterator = limiter.iterator();
+        assertEquals(Arrays.asList(1, 2, 3, 4, 5), StreamEx.of(iterator).toList());
+    } 
 }

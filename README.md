@@ -1,22 +1,22 @@
-# StreamEx 0.6.7
-Enhancing Java 8 Streams.
+# StreamEx 0.8.1
+Enhancing Java Stream API.
 
 [![Maven Central](https://img.shields.io/maven-central/v/one.util/streamex.svg)](https://maven-badges.herokuapp.com/maven-central/one.util/streamex/)
 [![Javadocs](https://www.javadoc.io/badge/one.util/streamex.svg)](https://www.javadoc.io/doc/one.util/streamex)
-[![Build Status](https://travis-ci.org/amaembo/streamex.png?branch=master)](https://travis-ci.org/amaembo/streamex)
+[![Build Status](https://github.com/amaembo/streamex/actions/workflows/test.yml/badge.svg)](https://travis-ci.org/amaembo/streamex)
 [![Coverage Status](https://coveralls.io/repos/amaembo/streamex/badge.svg?branch=master&service=github)](https://coveralls.io/github/amaembo/streamex?branch=master)
 
 This library defines four classes: `StreamEx`, `IntStreamEx`, `LongStreamEx`, `DoubleStreamEx`
 which are fully compatible with Java 8 stream classes and provide many additional useful methods.
 Also `EntryStream` class is provided which represents the stream of map entries and provides
-additional functionality for this case. Finally there are some new useful collectors defined in `MoreCollectors`
+additional functionality for this case. Finally, there are some new useful collectors defined in `MoreCollectors`
 class as well as primitive collectors concept.
 
 Full API documentation is available [here](http://amaembo.github.io/streamex/javadoc/).
 
-Take a look at the [Cheatsheet](CHEATSHEET.md) for brief introduction to the StreamEx!
+Take a look at the [Cheatsheet](wiki/CHEATSHEET.md) for brief introduction to the StreamEx!
 
-Before updating StreamEx check the [migration notes](MIGRATION.md) and full list of [changes](CHANGES.md).
+Before updating StreamEx check the [migration notes](wiki/MIGRATION.md) and full list of [changes](wiki/CHANGES.md).
 
 StreamEx library main points are following:
 
@@ -123,7 +123,7 @@ This project is licensed under [Apache License, version 2.0](https://www.apache.
 
 Releases are available in [Maven Central](https://repo1.maven.org/maven2/one/util/streamex/)
 
-Before updating StreamEx check the [migration notes](MIGRATION.md) and full list of [changes](CHANGES.md).
+Before updating StreamEx check the [migration notes](wiki/MIGRATION.md) and full list of [changes](wiki/CHANGES.md).
 
 #### Maven
 
@@ -133,7 +133,7 @@ Add this snippet to the pom.xml `dependencies` section:
 <dependency>
   <groupId>one.util</groupId>
   <artifactId>streamex</artifactId>
-  <version>0.6.7</version>
+  <version>0.8.1</version>
 </dependency>
 ```
 
@@ -142,7 +142,7 @@ Add this snippet to the pom.xml `dependencies` section:
 Add this snippet to the build.gradle `dependencies` section:
 
 ```groovy
-implementation 'one.util:streamex:0.6.7'
+implementation 'one.util:streamex:0.8.1'
 ```
 
 Pull requests are welcome.

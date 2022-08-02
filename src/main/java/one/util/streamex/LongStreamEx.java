@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,21 +16,55 @@
 package one.util.streamex;
 
 import java.nio.Buffer;
-import java.util.*;
+import java.util.AbstractMap;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.LongSummaryStatistics;
 import java.util.Map.Entry;
+import java.util.Objects;
+import java.util.OptionalDouble;
+import java.util.OptionalLong;
+import java.util.PrimitiveIterator;
 import java.util.PrimitiveIterator.OfLong;
+import java.util.Random;
+import java.util.Spliterator;
+import java.util.Spliterators;
 import java.util.concurrent.ForkJoinPool;
-import java.util.function.*;
-import java.util.stream.*;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
+import java.util.function.LongBinaryOperator;
+import java.util.function.LongConsumer;
+import java.util.function.LongFunction;
+import java.util.function.LongPredicate;
+import java.util.function.LongSupplier;
+import java.util.function.LongToDoubleFunction;
+import java.util.function.LongToIntFunction;
+import java.util.function.LongUnaryOperator;
+import java.util.function.ObjLongConsumer;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import java.util.stream.Collector;
+import java.util.stream.DoubleStream;
+import java.util.stream.IntStream;
+import java.util.stream.LongStream;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
-import static one.util.streamex.StreamExInternals.*;
+import static one.util.streamex.Internals.Box;
+import static one.util.streamex.Internals.INITIAL_SIZE;
+import static one.util.streamex.Internals.LongBuffer;
+import static one.util.streamex.Internals.ObjLongBox;
+import static one.util.streamex.Internals.PrimitiveBox;
+import static one.util.streamex.Internals.checkLength;
+import static one.util.streamex.Internals.intSize;
 
 /**
  * A {@link LongStream} implementation with additional functionality
  * 
  * @author Tagir Valeev
  */
-public class LongStreamEx extends BaseStreamEx<Long, LongStream, Spliterator.OfLong, LongStreamEx> implements
+public final class LongStreamEx extends BaseStreamEx<Long, LongStream, Spliterator.OfLong, LongStreamEx> implements
         LongStream {
     LongStreamEx(LongStream stream, StreamContext context) {
         super(stream, context);
@@ -607,44 +641,6 @@ public class LongStreamEx extends BaseStreamEx<Long, LongStream, Spliterator.OfL
         return new LongStreamEx(stream().skip(n), context);
     }
 
-    /**
-     * Returns a stream consisting of the remaining elements of this stream
-     * after discarding the first {@code n} elements of the stream. If this
-     * stream contains fewer than {@code n} elements then an empty stream will
-     * be returned.
-     *
-     * <p>
-     * This is a stateful quasi-intermediate operation. Unlike
-     * {@link #skip(long)} it skips the first elements even if the stream is
-     * unordered. The main purpose of this method is to workaround the problem
-     * of skipping the first elements from non-sized source with further
-     * parallel processing and unordered terminal operation (such as
-     * {@link #forEach(LongConsumer)}). This problem was fixed in OracleJDK
-     * 8u60.
-     * 
-     * <p>
-     * Also it behaves much better with infinite streams processed in parallel.
-     * For example,
-     * {@code LongStreamEx.iterate(0L, i->i+1).skip(1).limit(100).parallel().toArray()}
-     * will likely to fail with {@code OutOfMemoryError}, but will work nicely
-     * if {@code skip} is replaced with {@code skipOrdered}.
-     *
-     * <p>
-     * For sequential streams this method behaves exactly like
-     * {@link #skip(long)}.
-     *
-     * @param n the number of leading elements to skip
-     * @return the new stream
-     * @throws IllegalArgumentException if {@code n} is negative
-     * @see #skip(long)
-     * @since 0.3.2
-     */
-    public LongStreamEx skipOrdered(long n) {
-        Spliterator.OfLong spliterator = (isParallel() ? StreamSupport.longStream(spliterator(), false) : stream())
-                .skip(n).spliterator();
-        return delegate(spliterator);
-    }
-
     @Override
     public void forEach(LongConsumer action) {
         if (spliterator != null && !isParallel()) {
@@ -823,8 +819,8 @@ public class LongStreamEx extends BaseStreamEx<Long, LongStream, Spliterator.OfL
      */
     public long[] scanLeft(LongBinaryOperator accumulator) {
         Spliterator.OfLong spliterator = spliterator();
-        long size = spliterator.getExactSizeIfKnown();
-        LongBuffer buf = new LongBuffer(size >= 0 && size <= Integer.MAX_VALUE ? (int) size : INITIAL_SIZE);
+        int size = intSize(spliterator);
+        LongBuffer buf = new LongBuffer(size >= 0 ? size : INITIAL_SIZE);
         delegate(spliterator).forEachOrdered(i -> buf.add(buf.size == 0 ? i
                 : accumulator.applyAsLong(buf.data[buf.size - 1], i)));
         return buf.toArray();
@@ -1484,7 +1480,7 @@ public class LongStreamEx extends BaseStreamEx<Long, LongStream, Spliterator.OfL
      * @see #dropWhile(LongPredicate)
      */
     public LongStreamEx takeWhile(LongPredicate predicate) {
-        return VER_SPEC.callWhile(this, Objects.requireNonNull(predicate), false);
+        return VerSpec.VER_SPEC.callWhile(this, Objects.requireNonNull(predicate), false);
     }
 
     /**
@@ -1533,7 +1529,7 @@ public class LongStreamEx extends BaseStreamEx<Long, LongStream, Spliterator.OfL
      * @since 0.3.6
      */
     public LongStreamEx dropWhile(LongPredicate predicate) {
-        return VER_SPEC.callWhile(this, Objects.requireNonNull(predicate), true);
+        return VerSpec.VER_SPEC.callWhile(this, Objects.requireNonNull(predicate), true);
     }
 
     /**
@@ -1565,7 +1561,9 @@ public class LongStreamEx extends BaseStreamEx<Long, LongStream, Spliterator.OfL
      * @since 0.6.1
      */
     public LongStreamEx prefix(LongBinaryOperator op) {
-        return delegate(new PrefixOps.OfLong(spliterator(), op));
+        Spliterator.OfLong spltr = spliterator();
+        return delegate(spltr.hasCharacteristics(Spliterator.ORDERED) ? new PrefixOps.OfLong(spltr, op)
+                : new PrefixOps.OfUnordLong(spltr, op));
     }
 
     // Necessary to generate proper JavaDoc
@@ -1983,11 +1981,11 @@ public class LongStreamEx extends BaseStreamEx<Long, LongStream, Spliterator.OfL
      * Returns a sequential ordered {@code LongStreamEx} from
      * {@code startInclusive} (inclusive) to {@code endExclusive} (exclusive) by
      * the specified incremental step. The negative step values are also
-     * supported. In this case the {@code startInclusive} should be greater than
+     * supported. In this case, the {@code startInclusive} should be greater than
      * {@code endExclusive}.
      *
      * @param startInclusive the (inclusive) initial value
-     * @param endExclusive the exclusive upper bound
+     * @param endExclusive the exclusive upper (for positive step) or lower (for negative step) bound
      * @param step the non-zero value which designates the difference between
      *        the consecutive values of the resulting stream.
      * @return a sequential {@code LongStreamEx} for the range of {@code long}
@@ -2022,7 +2020,7 @@ public class LongStreamEx extends BaseStreamEx<Long, LongStream, Spliterator.OfL
      * Returns a sequential ordered {@code LongStreamEx} from
      * {@code startInclusive} (inclusive) to {@code endInclusive} (inclusive) by
      * the specified incremental step. The negative step values are also
-     * supported. In this case the {@code startInclusive} should be greater than
+     * supported. In this case, the {@code startInclusive} should be not less than
      * {@code endInclusive}.
      * 
      * <p>
@@ -2032,11 +2030,13 @@ public class LongStreamEx extends BaseStreamEx<Long, LongStream, Spliterator.OfL
      * numbers: 0L, 2L and 4L.
      *
      * @param startInclusive the (inclusive) initial value
-     * @param endInclusive the inclusive upper bound
+     * @param endInclusive the inclusive upper (for positive step) or lower (for negative step) bound
      * @param step the non-zero value which designates the difference between
      *        the consecutive values of the resulting stream.
      * @return a sequential {@code LongStreamEx} for the range of {@code long}
-     *         elements
+     *         elements; an empty stream if startInclusive is greater than endInclusive
+     *         for positive step, or if startInclusive is less than endInclusive
+     *         for negative step.
      * @throws IllegalArgumentException if step is zero
      * @see LongStreamEx#rangeClosed(long, long)
      * @since 0.4.0
@@ -2044,6 +2044,8 @@ public class LongStreamEx extends BaseStreamEx<Long, LongStream, Spliterator.OfL
     public static LongStreamEx rangeClosed(long startInclusive, long endInclusive, long step) {
         if (step == 0)
             throw new IllegalArgumentException("step = 0");
+        if (endInclusive == startInclusive)
+            return LongStreamEx.of(startInclusive);
         if (step == 1)
             return seq(LongStream.rangeClosed(startInclusive, endInclusive));
         if (step == -1) {
@@ -2052,7 +2054,7 @@ public class LongStreamEx extends BaseStreamEx<Long, LongStream, Spliterator.OfL
             long sum = endInclusive + startInclusive;
             return seq(LongStream.rangeClosed(endInclusive, startInclusive).map(x -> sum - x));
         }
-        if ((endInclusive > startInclusive ^ step > 0) || endInclusive == startInclusive)
+        if ((endInclusive > startInclusive) != (step > 0))
             return empty();
         long limit = (endInclusive - startInclusive) * Long.signum(step);
         limit = Long.divideUnsigned(limit, Math.abs(step));

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,15 +15,22 @@
  */
 package one.util.streamex;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Set;
+
+import one.util.streamex.Internals.PairBox;
 import org.junit.Test;
 
-import java.lang.invoke.MethodHandle;
-import java.util.*;
-import java.util.stream.Stream;
-
-import static one.util.streamex.StreamExInternals.ArrayCollection;
-import static one.util.streamex.StreamExInternals.PartialCollector;
-import static org.junit.Assert.*;
+import static one.util.streamex.Internals.ArrayCollection;
+import static one.util.streamex.Internals.PartialCollector;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Tests for non-public APIs in StreamExInternals
@@ -51,13 +58,19 @@ public class InternalsTest {
     public void testPartialCollector() {
         PartialCollector.intSum().accumulator();
     }
-
+    
+    @SuppressWarnings({"SimplifiableAssertion", "EqualsBetweenInconvertibleTypes"})
     @Test
-    public void testJdk9Basics() {
-        MethodHandle[][] jdk9Methods = Java9Specific.initJdk9Methods();
-        if (Stream.of(Stream.class.getMethods()).anyMatch(m -> m.getName().equals("takeWhile")))
-            assertNotNull(jdk9Methods);
-        else
-            assertNull(jdk9Methods);
+    public void testPairBoxEquals() {
+        PairBox<Integer, Integer> boxOneTwo = new PairBox<>(1, 2);
+        PairBox<Integer, Integer> boxTwoTwo = new PairBox<>(2, 2);
+        PairBox<Integer, Integer> boxTwoOne = new PairBox<>(2, 1);
+        PairBox<Integer, Integer> boxOneOne = new PairBox<>(1, 1);
+        assertFalse(boxOneOne.equals(null));
+        assertFalse(boxOneOne.equals(""));
+        assertEquals(boxOneTwo, boxTwoTwo);
+        assertNotEquals(boxOneTwo, boxTwoOne);
+        assertNotEquals(boxOneTwo, boxOneOne);
+        assertEquals(boxTwoOne, boxOneOne);
     }
 }

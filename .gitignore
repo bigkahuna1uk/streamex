@@ -1,7 +1,16 @@
 /target/
+/benchmark/target/
+
+# Eclipse
+/.settings
+/.metadata
 
 # IntelliJ IDEA
-.idea/dictionaries/
+/.idea/dictionaries/
+/.idea/workspace.xml
+/.idea/uiDesigner.xml
+/.idea/misc.xml
+/.idea/shelf
 
 # Mac OS/X
 .DS_Store

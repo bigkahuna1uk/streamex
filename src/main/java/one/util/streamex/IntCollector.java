@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,19 @@ import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import static one.util.streamex.StreamExInternals.*;
+import static one.util.streamex.Internals.AverageLong;
+import static one.util.streamex.Internals.BooleanMap;
+import static one.util.streamex.Internals.Box;
+import static one.util.streamex.Internals.ByteBuffer;
+import static one.util.streamex.Internals.CharBuffer;
+import static one.util.streamex.Internals.ID_CHARACTERISTICS;
+import static one.util.streamex.Internals.IntBuffer;
+import static one.util.streamex.Internals.IntCollectorImpl;
+import static one.util.streamex.Internals.NO_CHARACTERISTICS;
+import static one.util.streamex.Internals.PartialCollector;
+import static one.util.streamex.Internals.PrimitiveBox;
+import static one.util.streamex.Internals.ShortBuffer;
+import static one.util.streamex.Internals.UNBOX_INT;
 
 /**
  * A {@link Collector} specialized to work with primitive {@code int}.
@@ -57,7 +69,8 @@ public interface IntCollector<A, R> extends MergingCollector<Integer, A, R> {
 
     /**
      * A function that folds a value into a mutable result container.
-     * 
+     *
+     * <p>
      * The default implementation calls {@link #intAccumulator()} on unboxed
      * value.
      *
@@ -149,7 +162,7 @@ public interface IntCollector<A, R> extends MergingCollector<Integer, A, R> {
      */
     static IntCollector<?, String> joining(CharSequence delimiter, CharSequence prefix, CharSequence suffix) {
         return PartialCollector.joining(delimiter, prefix, suffix, true).asInt(
-            StreamExInternals.joinAccumulatorInt(delimiter));
+            Internals.joinAccumulatorInt(delimiter));
     }
 
     /**
@@ -163,7 +176,7 @@ public interface IntCollector<A, R> extends MergingCollector<Integer, A, R> {
      */
     static IntCollector<?, String> joining(CharSequence delimiter) {
         return PartialCollector.joining(delimiter, null, null, false).asInt(
-            StreamExInternals.joinAccumulatorInt(delimiter));
+            Internals.joinAccumulatorInt(delimiter));
     }
 
     /**
@@ -339,6 +352,7 @@ public interface IntCollector<A, R> extends MergingCollector<Integer, A, R> {
      * according to an {@code IntPredicate}, and organizes them into a
      * {@code Map<Boolean, int[]>}.
      *
+     * <p>
      * There are no guarantees on the type, mutability, serializability, or
      * thread-safety of the {@code Map} returned.
      *

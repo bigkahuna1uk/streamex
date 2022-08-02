@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,21 +16,57 @@
 package one.util.streamex;
 
 import java.nio.Buffer;
-import java.util.*;
+import java.util.AbstractMap;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.DoubleSummaryStatistics;
 import java.util.Map.Entry;
+import java.util.Objects;
+import java.util.OptionalDouble;
+import java.util.OptionalLong;
+import java.util.PrimitiveIterator;
 import java.util.PrimitiveIterator.OfDouble;
+import java.util.Random;
+import java.util.Spliterator;
+import java.util.Spliterators;
 import java.util.concurrent.ForkJoinPool;
-import java.util.function.*;
-import java.util.stream.*;
+import java.util.function.BiConsumer;
+import java.util.function.DoubleBinaryOperator;
+import java.util.function.DoubleConsumer;
+import java.util.function.DoubleFunction;
+import java.util.function.DoublePredicate;
+import java.util.function.DoubleSupplier;
+import java.util.function.DoubleToIntFunction;
+import java.util.function.DoubleToLongFunction;
+import java.util.function.DoubleUnaryOperator;
+import java.util.function.Function;
+import java.util.function.ObjDoubleConsumer;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import java.util.stream.Collector;
+import java.util.stream.DoubleStream;
+import java.util.stream.IntStream;
+import java.util.stream.LongStream;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
-import static one.util.streamex.StreamExInternals.*;
+import static one.util.streamex.Internals.Box;
+import static one.util.streamex.Internals.DoubleBuffer;
+import static one.util.streamex.Internals.FloatBuffer;
+import static one.util.streamex.Internals.INITIAL_SIZE;
+import static one.util.streamex.Internals.ObjDoubleBox;
+import static one.util.streamex.Internals.PrimitiveBox;
+import static one.util.streamex.Internals.checkLength;
+import static one.util.streamex.Internals.intSize;
+import static one.util.streamex.Internals.rangeCheck;
 
 /**
  * A {@link DoubleStream} implementation with additional functionality
  * 
  * @author Tagir Valeev
  */
-public class DoubleStreamEx extends BaseStreamEx<Double, DoubleStream, Spliterator.OfDouble, DoubleStreamEx> implements
+public final class DoubleStreamEx extends BaseStreamEx<Double, DoubleStream, Spliterator.OfDouble, DoubleStreamEx> implements
         DoubleStream {
     DoubleStreamEx(DoubleStream stream, StreamContext context) {
         super(stream, context);
@@ -359,8 +395,11 @@ public class DoubleStreamEx extends BaseStreamEx<Double, DoubleStream, Spliterat
     public DoubleStreamEx reverseSorted() {
         return new DoubleStreamEx(stream().mapToLong(d -> {
             long l = Double.doubleToRawLongBits(d);
-            return l ^ (((l >>> 63) - 1) | Long.MIN_VALUE);
-        }).sorted().mapToDouble(l -> Double.longBitsToDouble(l ^ ((-(l >>> 63)) | Long.MIN_VALUE))), context);
+            return (l ^ (((l >>> 63) - 1) | Long.MIN_VALUE)) + 0xfffffffffffffL;
+        }).sorted().mapToDouble(l -> {
+            l -= 0xfffffffffffffL;
+            return Double.longBitsToDouble(l ^ ((-(l >>> 63)) | Long.MIN_VALUE));
+        }), context);
     }
 
     /**
@@ -542,44 +581,6 @@ public class DoubleStreamEx extends BaseStreamEx<Double, DoubleStream, Spliterat
         return new DoubleStreamEx(stream().skip(n), context);
     }
 
-    /**
-     * Returns a stream consisting of the remaining elements of this stream
-     * after discarding the first {@code n} elements of the stream. If this
-     * stream contains fewer than {@code n} elements then an empty stream will
-     * be returned.
-     *
-     * <p>
-     * This is a stateful quasi-intermediate operation. Unlike
-     * {@link #skip(long)} it skips the first elements even if the stream is
-     * unordered. The main purpose of this method is to workaround the problem
-     * of skipping the first elements from non-sized source with further
-     * parallel processing and unordered terminal operation (such as
-     * {@link #forEach(DoubleConsumer)}). This problem was fixed in OracleJDK
-     * 8u60.
-     * 
-     * <p>
-     * Also it behaves much better with infinite streams processed in parallel.
-     * For example,
-     * {@code DoubleStreamEx.iterate(0.0, i->i+1).skip(1).limit(100).parallel().toArray()}
-     * will likely to fail with {@code OutOfMemoryError}, but will work nicely
-     * if {@code skip} is replaced with {@code skipOrdered}.
-     *
-     * <p>
-     * For sequential streams this method behaves exactly like
-     * {@link #skip(long)}.
-     *
-     * @param n the number of leading elements to skip
-     * @return the new stream
-     * @throws IllegalArgumentException if {@code n} is negative
-     * @see #skip(long)
-     * @since 0.3.2
-     */
-    public DoubleStreamEx skipOrdered(long n) {
-        Spliterator.OfDouble spliterator = (isParallel() ? StreamSupport.doubleStream(spliterator(), false) : stream())
-                .skip(n).spliterator();
-        return delegate(spliterator);
-    }
-
     @Override
     public void forEach(DoubleConsumer action) {
         if (spliterator != null && !isParallel()) {
@@ -633,10 +634,10 @@ public class DoubleStreamEx extends BaseStreamEx<Double, DoubleStream, Spliterat
         if (isParallel())
             return collect(DoubleCollector.toFloatArray());
         java.util.Spliterator.OfDouble spliterator = spliterator();
-        long size = spliterator.getExactSizeIfKnown();
+        int size = intSize(spliterator);
         FloatBuffer buf;
-        if (size >= 0 && size <= Integer.MAX_VALUE) {
-            buf = new FloatBuffer((int) size);
+        if (size >= 0) {
+            buf = new FloatBuffer(size);
             spliterator.forEachRemaining((DoubleConsumer) buf::addUnsafe);
         } else {
             buf = new FloatBuffer();
@@ -784,8 +785,8 @@ public class DoubleStreamEx extends BaseStreamEx<Double, DoubleStream, Spliterat
      */
     public double[] scanLeft(DoubleBinaryOperator accumulator) {
         Spliterator.OfDouble spliterator = spliterator();
-        double size = spliterator.getExactSizeIfKnown();
-        DoubleBuffer buf = new DoubleBuffer(size >= 0 && size <= Integer.MAX_VALUE ? (int) size : INITIAL_SIZE);
+        int size = intSize(spliterator);
+        DoubleBuffer buf = new DoubleBuffer(size == -1 ? INITIAL_SIZE : size);
         delegate(spliterator).forEachOrdered(i -> buf.add(buf.size == 0 ? i
                 : accumulator.applyAsDouble(buf.data[buf.size - 1], i)));
         return buf.toArray();
@@ -1422,7 +1423,7 @@ public class DoubleStreamEx extends BaseStreamEx<Double, DoubleStream, Spliterat
      * @see #dropWhile(DoublePredicate)
      */
     public DoubleStreamEx takeWhile(DoublePredicate predicate) {
-        return VER_SPEC.callWhile(this, Objects.requireNonNull(predicate), false);
+        return VerSpec.VER_SPEC.callWhile(this, Objects.requireNonNull(predicate), false);
     }
 
     /**
@@ -1471,7 +1472,7 @@ public class DoubleStreamEx extends BaseStreamEx<Double, DoubleStream, Spliterat
      * @since 0.3.6
      */
     public DoubleStreamEx dropWhile(DoublePredicate predicate) {
-        return VER_SPEC.callWhile(this, Objects.requireNonNull(predicate), true);
+        return VerSpec.VER_SPEC.callWhile(this, Objects.requireNonNull(predicate), true);
     }
 
     /**

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,8 @@ import java.util.function.Supplier;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
-import static one.util.streamex.StreamExInternals.*;
+import static one.util.streamex.Internals.alwaysTrue;
+import static one.util.streamex.Internals.checkNonNegative;
 
 /**
  * An advanced implementation of joining {@link Collector}. This collector is
@@ -396,13 +397,13 @@ public class Joining extends CancellableCollector<CharSequence, Joining.Accumula
      * ellipsis sequence. The cutting strategy is mostly irrelevant for this
      * mode except {@link #cutBeforeDelimiter()}.
      * <p>
-     * The collector returned by this method is <a href="package-summary.html#ShortCircuitReduction">short-circuiting</a>:
+     * The collector returned by this method is
+     * <a href="package-summary.html#ShortCircuitReduction">short-circuiting</a>:
      * it may not process all the input elements if the limit is reached.
      *
-     * @param limit the maximal number of input elements in the resulting
-     *              String.
+     * @param limit the maximal number of input elements in the resulting String.
      * @return a new {@code Collector} which will produce String no longer than
-     * given limit.
+     *         given limit.
      * @since 0.6.7
      */
     public Joining maxElements(int limit) {
@@ -642,7 +643,7 @@ public class Joining extends CancellableCollector<CharSequence, Joining.Accumula
             return null;
         init();
         if (limit <= 0 && lenStrategy != LENGTH_ELEMENTS)
-            return acc -> true;
+            return alwaysTrue();
         return acc -> acc.count > limit;
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,11 +23,9 @@ import java.util.function.BinaryOperator;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
-import static one.util.streamex.TestHelpers.*;
-import one.util.streamex.IntStreamEx;
-import one.util.streamex.OrderedCancellableSpliterator;
-
 import org.junit.Test;
+
+import static one.util.streamex.TestHelpers.checkSpliterator;
 
 /**
  * @author Tagir Valeev

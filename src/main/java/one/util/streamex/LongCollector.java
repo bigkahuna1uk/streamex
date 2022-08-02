@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,7 +33,16 @@ import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
-import static one.util.streamex.StreamExInternals.*;
+import static one.util.streamex.Internals.AverageLong;
+import static one.util.streamex.Internals.BooleanMap;
+import static one.util.streamex.Internals.Box;
+import static one.util.streamex.Internals.ID_CHARACTERISTICS;
+import static one.util.streamex.Internals.LongBuffer;
+import static one.util.streamex.Internals.LongCollectorImpl;
+import static one.util.streamex.Internals.NO_CHARACTERISTICS;
+import static one.util.streamex.Internals.PartialCollector;
+import static one.util.streamex.Internals.PrimitiveBox;
+import static one.util.streamex.Internals.UNBOX_LONG;
 
 /**
  * A {@link Collector} specialized to work with primitive {@code long}.
@@ -56,7 +65,8 @@ public interface LongCollector<A, R> extends MergingCollector<Long, A, R> {
 
     /**
      * A function that folds a value into a mutable result container.
-     * 
+     *
+     * <p>
      * The default implementation calls {@link #longAccumulator()} on unboxed
      * value.
      *
@@ -148,7 +158,7 @@ public interface LongCollector<A, R> extends MergingCollector<Long, A, R> {
      */
     static LongCollector<?, String> joining(CharSequence delimiter, CharSequence prefix, CharSequence suffix) {
         return PartialCollector.joining(delimiter, prefix, suffix, true).asLong(
-            StreamExInternals.joinAccumulatorLong(delimiter));
+            Internals.joinAccumulatorLong(delimiter));
     }
 
     /**
@@ -162,7 +172,7 @@ public interface LongCollector<A, R> extends MergingCollector<Long, A, R> {
      */
     static LongCollector<?, String> joining(CharSequence delimiter) {
         return PartialCollector.joining(delimiter, null, null, false).asLong(
-            StreamExInternals.joinAccumulatorLong(delimiter));
+            Internals.joinAccumulatorLong(delimiter));
     }
 
     /**
@@ -338,6 +348,7 @@ public interface LongCollector<A, R> extends MergingCollector<Long, A, R> {
      * according to a {@code LongPredicate}, and organizes them into a
      * {@code Map<Boolean, long[]>}.
      *
+     * <p>
      * There are no guarantees on the type, mutability, serializability, or
      * thread-safety of the {@code Map} returned.
      *

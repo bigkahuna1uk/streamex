@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,22 +19,65 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.Buffer;
-import java.util.*;
+import java.util.AbstractMap;
+import java.util.Arrays;
+import java.util.BitSet;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.IntSummaryStatistics;
+import java.util.List;
 import java.util.Map.Entry;
+import java.util.Objects;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
+import java.util.PrimitiveIterator;
 import java.util.PrimitiveIterator.OfInt;
+import java.util.Random;
+import java.util.Spliterator;
+import java.util.Spliterators;
 import java.util.Spliterators.AbstractIntSpliterator;
 import java.util.concurrent.ForkJoinPool;
-import java.util.function.*;
-import java.util.stream.*;
+import java.util.function.BiConsumer;
+import java.util.function.DoublePredicate;
+import java.util.function.Function;
+import java.util.function.IntBinaryOperator;
+import java.util.function.IntConsumer;
+import java.util.function.IntFunction;
+import java.util.function.IntPredicate;
+import java.util.function.IntSupplier;
+import java.util.function.IntToDoubleFunction;
+import java.util.function.IntToLongFunction;
+import java.util.function.IntUnaryOperator;
+import java.util.function.LongPredicate;
+import java.util.function.ObjIntConsumer;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import java.util.stream.Collector;
+import java.util.stream.DoubleStream;
+import java.util.stream.IntStream;
+import java.util.stream.LongStream;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
-import static one.util.streamex.StreamExInternals.*;
+import static one.util.streamex.Internals.Box;
+import static one.util.streamex.Internals.ByteBuffer;
+import static one.util.streamex.Internals.CharBuffer;
+import static one.util.streamex.Internals.INITIAL_SIZE;
+import static one.util.streamex.Internals.IntBuffer;
+import static one.util.streamex.Internals.ObjIntBox;
+import static one.util.streamex.Internals.PrimitiveBox;
+import static one.util.streamex.Internals.ShortBuffer;
+import static one.util.streamex.Internals.checkLength;
+import static one.util.streamex.Internals.intSize;
+import static one.util.streamex.Internals.rangeCheck;
 
 /**
  * An {@link IntStream} implementation with additional functionality
  * 
  * @author Tagir Valeev
  */
-public class IntStreamEx extends BaseStreamEx<Integer, IntStream, Spliterator.OfInt, IntStreamEx> implements IntStream {
+public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Spliterator.OfInt, IntStreamEx> implements IntStream {
     IntStreamEx(IntStream stream, StreamContext context) {
         super(stream, context);
     }
@@ -61,10 +104,10 @@ public class IntStreamEx extends BaseStreamEx<Integer, IntStream, Spliterator.Of
         if (isParallel())
             return collect(supplier, accumulator, combiner);
         java.util.Spliterator.OfInt spliterator = spliterator();
-        long size = spliterator.getExactSizeIfKnown();
+        int size = intSize(spliterator);
         A intermediate;
-        if (size >= 0 && size <= Integer.MAX_VALUE) {
-            intermediate = sizedSupplier.apply((int) size);
+        if (size != -1) {
+            intermediate = sizedSupplier.apply(size);
             spliterator.forEachRemaining((IntConsumer) i -> sizedAccumulator.accept(intermediate, i));
         } else {
             intermediate = supplier.get();
@@ -583,43 +626,6 @@ public class IntStreamEx extends BaseStreamEx<Integer, IntStream, Spliterator.Of
         return new IntStreamEx(stream().skip(n), context);
     }
 
-    /**
-     * Returns a stream consisting of the remaining elements of this stream
-     * after discarding the first {@code n} elements of the stream. If this
-     * stream contains fewer than {@code n} elements then an empty stream will
-     * be returned.
-     *
-     * <p>
-     * This is a stateful quasi-intermediate operation. Unlike
-     * {@link #skip(long)} it skips the first elements even if the stream is
-     * unordered. The main purpose of this method is to workaround the problem
-     * of skipping the first elements from non-sized source with further
-     * parallel processing and unordered terminal operation (such as
-     * {@link #forEach(IntConsumer)}). This problem was fixed in OracleJDK 8u60.
-     * 
-     * <p>
-     * Also it behaves much better with infinite streams processed in parallel.
-     * For example,
-     * {@code IntStreamEx.iterate(0, i->i+1).skip(1).limit(100).parallel().toArray()}
-     * will likely to fail with {@code OutOfMemoryError}, but will work nicely
-     * if {@code skip} is replaced with {@code skipOrdered}.
-     *
-     * <p>
-     * For sequential streams this method behaves exactly like
-     * {@link #skip(long)}.
-     *
-     * @param n the number of leading elements to skip
-     * @return the new stream
-     * @throws IllegalArgumentException if {@code n} is negative
-     * @see #skip(long)
-     * @since 0.3.2
-     */
-    public IntStreamEx skipOrdered(long n) {
-        Spliterator.OfInt spliterator = (isParallel() ? StreamSupport.intStream(spliterator(), false) : stream()).skip(
-            n).spliterator();
-        return delegate(spliterator);
-    }
-
     @Override
     public void forEach(IntConsumer action) {
         if (spliterator != null && !isParallel()) {
@@ -895,8 +901,8 @@ public class IntStreamEx extends BaseStreamEx<Integer, IntStream, Spliterator.Of
      */
     public int[] scanLeft(IntBinaryOperator accumulator) {
         Spliterator.OfInt spliterator = spliterator();
-        long size = spliterator.getExactSizeIfKnown();
-        IntBuffer buf = new IntBuffer(size >= 0 && size <= Integer.MAX_VALUE ? (int) size : INITIAL_SIZE);
+        int size = intSize(spliterator);
+        IntBuffer buf = new IntBuffer(size >= 0 ? size : INITIAL_SIZE);
         delegate(spliterator).forEachOrdered(i -> buf.add(buf.size == 0 ? i
                 : accumulator.applyAsInt(buf.data[buf.size - 1], i)));
         return buf.toArray();
@@ -1671,7 +1677,7 @@ public class IntStreamEx extends BaseStreamEx<Integer, IntStream, Spliterator.Of
      * @see #dropWhile(IntPredicate)
      */
     public IntStreamEx takeWhile(IntPredicate predicate) {
-        return VER_SPEC.callWhile(this, Objects.requireNonNull(predicate), false);
+        return VerSpec.VER_SPEC.callWhile(this, Objects.requireNonNull(predicate), false);
     }
 
     /**
@@ -1720,7 +1726,7 @@ public class IntStreamEx extends BaseStreamEx<Integer, IntStream, Spliterator.Of
      * @since 0.3.6
      */
     public IntStreamEx dropWhile(IntPredicate predicate) {
-        return VER_SPEC.callWhile(this, Objects.requireNonNull(predicate), true);
+        return VerSpec.VER_SPEC.callWhile(this, Objects.requireNonNull(predicate), true);
     }
 
     /**
@@ -1795,7 +1801,9 @@ public class IntStreamEx extends BaseStreamEx<Integer, IntStream, Spliterator.Of
      * @since 0.6.1
      */
     public IntStreamEx prefix(IntBinaryOperator op) {
-        return delegate(new PrefixOps.OfInt(spliterator(), op));
+        Spliterator.OfInt spltr = spliterator();
+        return delegate(spltr.hasCharacteristics(Spliterator.ORDERED) ? new PrefixOps.OfInt(spltr, op)
+                : new PrefixOps.OfUnordInt(spltr, op));
     }
 
     // Necessary to generate proper JavaDoc
@@ -2346,13 +2354,13 @@ public class IntStreamEx extends BaseStreamEx<Integer, IntStream, Spliterator.Of
      * @see CharSequence#chars()
      */
     public static IntStreamEx ofChars(CharSequence seq) {
-        return of(VER_SPEC.ofChars(seq));
+        return of(VerSpec.VER_SPEC.ofChars(seq));
     }
 
     /**
      * Returns an {@code IntStreamEx} of code point values from the supplied
      * {@link CharSequence}. Any surrogate pairs encountered in the sequence are
-     * combined as if by {@linkplain Character#toCodePoint
+     * combined as if by {@linkplain Character#toCodePoint(char, char)
      * Character.toCodePoint} and the result is passed to the stream. Any other
      * code units, including ordinary BMP characters, unpaired surrogates, and
      * undefined code units, are zero-extended to {@code int} values which are
@@ -2555,11 +2563,11 @@ public class IntStreamEx extends BaseStreamEx<Integer, IntStream, Spliterator.Of
      * Returns a sequential ordered {@code IntStreamEx} from
      * {@code startInclusive} (inclusive) to {@code endExclusive} (exclusive) by
      * the specified incremental step. The negative step values are also
-     * supported. In this case the {@code startInclusive} should be greater than
+     * supported. In this case, the {@code startInclusive} should be greater than
      * {@code endExclusive}.
      *
      * @param startInclusive the (inclusive) initial value
-     * @param endExclusive the exclusive upper bound
+     * @param endExclusive the exclusive upper (for positive step) or lower (for negative step) bound
      * @param step the non-zero value which designates the difference between
      *        the consecutive values of the resulting stream.
      * @return a sequential {@code IntStreamEx} for the range of {@code int}
@@ -2594,7 +2602,7 @@ public class IntStreamEx extends BaseStreamEx<Integer, IntStream, Spliterator.Of
      * Returns a sequential ordered {@code IntStreamEx} from
      * {@code startInclusive} (inclusive) to {@code endInclusive} (inclusive) by
      * the specified incremental step. The negative step values are also
-     * supported. In this case the {@code startInclusive} should be greater than
+     * supported. In this case, the {@code startInclusive} should be not less than
      * {@code endInclusive}.
      * 
      * <p>
@@ -2604,11 +2612,13 @@ public class IntStreamEx extends BaseStreamEx<Integer, IntStream, Spliterator.Of
      * numbers: 0, 2 and 4.
      *
      * @param startInclusive the (inclusive) initial value
-     * @param endInclusive the inclusive upper bound
+     * @param endInclusive the inclusive upper (for positive step) or lower (for negative step) bound
      * @param step the non-zero value which designates the difference between
      *        the consecutive values of the resulting stream.
      * @return a sequential {@code IntStreamEx} for the range of {@code int}
-     *         elements
+     *         elements; an empty stream if startInclusive is greater than endInclusive
+     *         for positive step, or if startInclusive is less than endInclusive
+     *         for negative step.
      * @throws IllegalArgumentException if step is zero
      * @see IntStreamEx#rangeClosed(int, int)
      * @since 0.4.0
@@ -2616,6 +2626,8 @@ public class IntStreamEx extends BaseStreamEx<Integer, IntStream, Spliterator.Of
     public static IntStreamEx rangeClosed(int startInclusive, int endInclusive, int step) {
         if (step == 0)
             throw new IllegalArgumentException("step = 0");
+        if (endInclusive == startInclusive)
+            return IntStreamEx.of(startInclusive);
         if (step == 1)
             return seq(IntStream.rangeClosed(startInclusive, endInclusive));
         if (step == -1) {
@@ -2624,7 +2636,7 @@ public class IntStreamEx extends BaseStreamEx<Integer, IntStream, Spliterator.Of
             int sum = endInclusive + startInclusive;
             return seq(IntStream.rangeClosed(endInclusive, startInclusive).map(x -> sum - x));
         }
-        if (endInclusive > startInclusive ^ step > 0)
+        if ((endInclusive > startInclusive) != (step > 0))
             return empty();
         int limit = (endInclusive - startInclusive) * Integer.signum(step);
         limit = Integer.divideUnsigned(limit, Math.abs(step));

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import java.util.stream.Stream;
 
 import org.junit.Test;
 
-import static one.util.streamex.TestHelpers.*;
+import static one.util.streamex.TestHelpers.checkSpliterator;
 
 /**
  * @author Tagir Valeev
@@ -34,7 +34,7 @@ public class TreeSpliteratorTest {
         List<String> expected = Arrays.asList("", "a", "aa", "aaa", "aaaa", "aaab", "aab", "aaba", "aabb", "ab", "aba",
             "abaa", "abab", "abb", "abba", "abbb", "b", "ba", "baa", "baaa", "baab", "bab", "baba", "babb", "bb", "bba",
             "bbaa", "bbab", "bbb", "bbba", "bbbb");
-        checkSpliterator("tree", expected, () -> new TreeSpliterator.Plain<String>("", s -> s.length() == 4 ? null
+        checkSpliterator("tree", expected, () -> new TreeSpliterator.Plain<>("", s -> s.length() == 4 ? null
                 : Stream.of("a", "b").map(s::concat)));
     }
 
@@ -42,7 +42,7 @@ public class TreeSpliteratorTest {
     public void testDepthSpliterator() {
         List<Entry<Integer, String>> expected = StreamEx.of("", "a", "aa", "ab", "ac", "b", "ba", "bb", "bc", "c", "ca",
             "cb", "cc").mapToEntry(String::length).invert().toList();
-        checkSpliterator("tree", expected, () -> new TreeSpliterator.Depth<String>("", (depth, s) -> depth == 2 ? null
-                : Stream.of("a", "b", "c").map(s::concat)));
+        checkSpliterator("tree", expected, () -> new TreeSpliterator.Depth<>("", (depth, s) -> depth == 2 ? null
+                : Stream.of("a", "b", "c").map(s::concat), 0));
     }
 }

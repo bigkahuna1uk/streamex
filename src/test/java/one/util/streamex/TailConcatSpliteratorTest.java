@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +15,6 @@
  */
 package one.util.streamex;
 
-import static org.junit.Assert.*;
-
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Queue;
@@ -25,6 +23,12 @@ import java.util.Spliterators;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
 import org.junit.Test;
+
+import static one.util.streamex.TestHelpers.consumeElement;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * @author Tagir Valeev
@@ -42,13 +46,13 @@ public class TailConcatSpliteratorTest {
         spltr = new TailConcatSpliterator<>(Spliterators.emptySpliterator(), Spliterators.emptySpliterator());
         assertTrue(spltr.hasCharacteristics(Spliterator.SIZED));
         assertEquals(0, spltr.getExactSizeIfKnown());
-        
-        spltr = new TailConcatSpliterator<>(IntStreamEx.range(1000).spliterator(), new HashSet<>(Arrays.asList(1,2,3)).spliterator());
+
+        spltr = new TailConcatSpliterator<>(IntStreamEx.range(1000).spliterator(), new HashSet<>(Arrays.asList(1, 2, 3)).spliterator());
         assertTrue(spltr.hasCharacteristics(Spliterator.SIZED));
         assertFalse(spltr.hasCharacteristics(Spliterator.SUBSIZED));
         assertFalse(spltr.hasCharacteristics(Spliterator.ORDERED));
         assertEquals(1003, spltr.getExactSizeIfKnown());
-        spltr.tryAdvance(x -> assertEquals(0, (int)x));
+        spltr.tryAdvance(x -> assertEquals(0, (int) x));
         assertEquals(1002, spltr.getExactSizeIfKnown());
         
         TailConcatSpliterator<Long> longSpltr = new TailConcatSpliterator<>(LongStreamEx.range(Long.MAX_VALUE / 2 + 1)
@@ -57,15 +61,15 @@ public class TailConcatSpliteratorTest {
         assertFalse(longSpltr.hasCharacteristics(Spliterator.SUBSIZED));
         assertTrue(longSpltr.hasCharacteristics(Spliterator.ORDERED));
         assertEquals(Long.MAX_VALUE, longSpltr.estimateSize());
-        longSpltr.tryAdvance(x -> assertEquals(0L, (long)x));
+        longSpltr.tryAdvance(x -> assertEquals(0L, (long) x));
         assertEquals(Long.MAX_VALUE, longSpltr.estimateSize());
         
         Queue<Integer> q = new ConcurrentLinkedDeque<>();
         spltr = new TailConcatSpliterator<>(q.spliterator(), q.spliterator());
         q.add(1);
         assertFalse(longSpltr.hasCharacteristics(Spliterator.SIZED));
-        assertTrue(spltr.tryAdvance(x -> assertEquals(1, (int)x)));
-        assertTrue(spltr.tryAdvance(x -> assertEquals(1, (int)x)));
+        consumeElement(spltr, 1);
+        consumeElement(spltr, 1);
         assertFalse(spltr.tryAdvance(x -> fail("Should not happen")));
     }
 }

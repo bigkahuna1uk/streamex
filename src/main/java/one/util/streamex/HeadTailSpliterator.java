@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,8 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
-import static one.util.streamex.StreamExInternals.*;
+import static one.util.streamex.Internals.Box;
+import static one.util.streamex.Internals.TailSpliterator;
 
 /**
  * @author Tagir Valeev
@@ -45,10 +46,10 @@ import static one.util.streamex.StreamExInternals.*;
     
     @Override
     public boolean tryAdvance(Consumer<? super U> action) {
-        if(!init())
+        if (!init())
             return false;
         target = TailSpliterator.tryAdvanceWithTail(target, action);
-        if(target == null) {
+        if (target == null) {
             context = null;
             return false;
         }
@@ -57,7 +58,7 @@ import static one.util.streamex.StreamExInternals.*;
 
     @Override
     public Spliterator<U> tryAdvanceOrTail(Consumer<? super U> action) {
-        if(!init())
+        if (!init())
             return null;
         Spliterator<U> tail = target;
         target = null;
@@ -67,7 +68,7 @@ import static one.util.streamex.StreamExInternals.*;
 
     @Override
     public void forEachRemaining(Consumer<? super U> action) {
-        if(!init())
+        if (!init())
             return;
         TailSpliterator.forEachWithTail(target, action);
         target = null;
@@ -80,20 +81,20 @@ import static one.util.streamex.StreamExInternals.*;
     }
 
     private boolean init() {
-        if(context == null)
+        if (context == null)
             return false;
-        if(target == null) {
+        if (target == null) {
             Box<T> first = new Box<>();
             source = TailSpliterator.tryAdvanceWithTail(source, first);
             Stream<U> stream = source == null ? emptyMapper.get() : mapper.apply(first.a, StreamEx.of(source));
             source = null;
             mapper = null;
             emptyMapper = null;
-            if(stream == null) {
+            if (stream == null) {
                 target = Spliterators.emptySpliterator();
             } else {
                 StreamContext ctx = StreamContext.of(stream);
-                if(ctx.closeHandler != null)
+                if (ctx.closeHandler != null)
                     context.onClose(ctx.closeHandler);
                 target = stream.spliterator();
             }
@@ -103,7 +104,7 @@ import static one.util.streamex.StreamExInternals.*;
     
     @Override
     public long estimateSize() {
-        if(context == null)
+        if (context == null)
             return 0;
         return (target == null ? source : target).estimateSize();
     }

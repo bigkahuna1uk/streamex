@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,8 +31,11 @@ import java.util.stream.Stream;
 
 import org.junit.Test;
 
-import static one.util.streamex.TestHelpers.*;
-import static org.junit.Assert.*;
+import static one.util.streamex.TestHelpers.checkSpliterator;
+import static one.util.streamex.TestHelpers.repeat;
+import static one.util.streamex.TestHelpers.withRandom;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
 /**
  * @author Tagir Valeev
@@ -40,8 +43,8 @@ import static org.junit.Assert.*;
  */
 public class CollapseSpliteratorTest {
     private static <T> void splitEquals(Spliterator<T> source, BiConsumer<Spliterator<T>, Spliterator<T>> consumer) {
-        Spliterator<T> right = new CollapseSpliterator<>(Objects::equals, Function.identity(), StreamExInternals
-                .selectFirst(), StreamExInternals.selectFirst(), source);
+        Spliterator<T> right = new CollapseSpliterator<>(Objects::equals, Function.identity(), Internals
+                .selectFirst(), Internals.selectFirst(), source);
         Spliterator<T> left = right.trySplit();
         assertNotNull(left);
         consumer.accept(left, right);
@@ -114,7 +117,7 @@ public class CollapseSpliteratorTest {
     private static void multiSplit(Supplier<Spliterator<Integer>> inputSpliterator) throws AssertionError {
         withRandom(r -> repeat(100, n -> {
             Spliterator<Integer> spliterator = new CollapseSpliterator<>(Objects::equals, Function.identity(),
-                    StreamExInternals.selectFirst(), StreamExInternals.selectFirst(), inputSpliterator.get());
+                    Internals.selectFirst(), Internals.selectFirst(), inputSpliterator.get());
             List<Integer> result = new ArrayList<>();
             List<Spliterator<Integer>> spliterators = new ArrayList<>();
             spliterators.add(spliterator);
@@ -124,7 +127,7 @@ public class CollapseSpliteratorTest {
                     spliterators.add(split);
             }
             Collections.shuffle(spliterators, r);
-            repeat(spliterators.size(), i -> spliterators.get(i-1).forEachRemaining(result::add));
+            repeat(spliterators.size(), i -> spliterators.get(i - 1).forEachRemaining(result::add));
             assertEquals(6, result.size());
         }));
     }

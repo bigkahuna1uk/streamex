@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,16 +15,16 @@
  */
 package one.util.streamex.api;
 
-import static org.junit.Assert.*;
-import static java.util.Arrays.asList;
-
 import java.util.List;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
+import org.junit.Test;
+
 import one.util.streamex.StreamEx;
 
-import org.junit.Test;
+import static java.util.Arrays.asList;
+import static org.junit.Assert.assertEquals;
 
 /**
  * @author Tagir Valeev
@@ -33,8 +33,7 @@ public class StreamExApiTest {
     @Test
     public void testMap() {
         BiFunction<StreamEx<Integer>, Function<Integer, Integer>, StreamEx<Integer>> streamMapper = StreamEx::map;
-		assertEquals(asList(2, 4, 10),
-				streamMapper.apply(StreamEx.of(1, 2, 5), x -> x * 2).toList());
+        assertEquals(asList(2, 4, 10), streamMapper.apply(StreamEx.of(1, 2, 5), x -> x * 2).toList());
     }
     
     @Test

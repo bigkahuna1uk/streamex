@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,8 +22,12 @@ import java.util.stream.Stream;
 
 import org.junit.Test;
 
-import static one.util.streamex.TestHelpers.*;
-import static org.junit.Assert.*;
+import static one.util.streamex.TestHelpers.checkSpliterator;
+import static one.util.streamex.TestHelpers.consumeElement;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * @author Tagir Valeev
@@ -42,15 +46,15 @@ public class WithFirstSpliteratorTest {
     @Test
     public void testCharacteristics() {
         WithFirstSpliterator<Integer, Integer> spltr = new WithFirstSpliterator<>(Stream.of(6, 1, 2, 3, 4, 5)
-                .spliterator(), (a, b) -> a + b);
+                .spliterator(), Integer::sum);
         assertTrue(spltr.hasCharacteristics(Spliterator.SIZED));
         assertEquals(6, spltr.getExactSizeIfKnown());
-        assertTrue(spltr.tryAdvance(x -> assertEquals(12, (int)x)));
+        consumeElement(spltr, 12);
         assertEquals(5, spltr.getExactSizeIfKnown());
-        assertTrue(spltr.tryAdvance(x -> assertEquals(7, (int)x)));
+        consumeElement(spltr, 7);
         assertEquals(4, spltr.getExactSizeIfKnown());
         
-        spltr = new WithFirstSpliterator<>(Spliterators.emptySpliterator(), (a, b) -> a + b);
+        spltr = new WithFirstSpliterator<>(Spliterators.emptySpliterator(), Integer::sum);
         assertTrue(spltr.hasCharacteristics(Spliterator.SIZED));
         assertEquals(0, spltr.getExactSizeIfKnown());
         assertFalse(spltr.tryAdvance(x -> fail("Should not happen")));
@@ -60,8 +64,8 @@ public class WithFirstSpliteratorTest {
                 .spliterator(), Long::sum);
         assertTrue(longSpltr.hasCharacteristics(Spliterator.SIZED));
         assertEquals(Long.MAX_VALUE, longSpltr.getExactSizeIfKnown());
-        assertTrue(longSpltr.tryAdvance(x -> assertEquals(0, (long)x)));
-        assertEquals(Long.MAX_VALUE-1, longSpltr.getExactSizeIfKnown());
+        consumeElement(longSpltr, 0L);
+        assertEquals(Long.MAX_VALUE - 1, longSpltr.getExactSizeIfKnown());
         
         longSpltr = new WithFirstSpliterator<>(LongStreamEx.range(-1, Long.MAX_VALUE)
                 .spliterator(), Long::sum);

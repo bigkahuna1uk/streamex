@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package one.util.streamex;
 import java.util.Spliterator;
 import java.util.function.Consumer;
 
-import one.util.streamex.StreamExInternals.TailSpliterator;
+import one.util.streamex.Internals.TailSpliterator;
 
 /**
  * @author Tagir Valeev
@@ -52,7 +52,7 @@ import one.util.streamex.StreamExInternals.TailSpliterator;
             }
             left = null;
         }
-        if(right != null)
+        if (right != null)
             right = TailSpliterator.tryAdvanceWithTail(right, action);
         return right != null;
     }
@@ -73,7 +73,7 @@ import one.util.streamex.StreamExInternals.TailSpliterator;
     public void forEachRemaining(Consumer<? super T> action) {
         if (left != null)
             left.forEachRemaining(action);
-        if(right != null)
+        if (right != null)
             TailSpliterator.forEachWithTail(right, action);
     }
 

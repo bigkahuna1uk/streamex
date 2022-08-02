@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,43 +23,11 @@ import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
 import java.util.function.IntConsumer;
 import java.util.function.LongConsumer;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
-
-import static one.util.streamex.StreamExInternals.*;
 
 /* package */abstract class UnknownSizeSpliterator<T, S extends UnknownSizeSpliterator<? extends T, S, I>, I extends Iterator<? extends T>>
         implements Spliterator<T> {
     static final int BATCH_UNIT = 1 << 10; // batch array size increment
     static final int MAX_BATCH = 1 << 25; // max batch array size;
-
-    /**
-     * Optimize the stream created on IteratorSpliterator replacing it with
-     * UnknownSizeSpliterator.
-     * 
-     * @param stream original stream
-     * @return either original or optimized stream
-     */
-    @SuppressWarnings("unchecked")
-    static <T> Stream<T> optimize(Stream<T> stream) {
-        if (SOURCE_SPLITERATOR == null || SPLITERATOR_ITERATOR == null)
-            return stream;
-        Iterator<T> it = null;
-        try {
-            Spliterator<T> spliterator = (Spliterator<T>) SOURCE_SPLITERATOR.get(stream);
-            if (spliterator != null && !spliterator.hasCharacteristics(SIZED)
-                && spliterator.getClass().getName().equals("java.util.Spliterators$IteratorSpliterator")) {
-                it = (Iterator<T>) SPLITERATOR_ITERATOR.get(spliterator);
-            }
-        } catch (IllegalArgumentException | IllegalAccessException e) {
-            // ignore
-        }
-        if (it == null)
-            return stream;
-        //noinspection ResultOfMethodCallIgnored
-        stream.spliterator(); // consume stream
-        return StreamSupport.stream(new USOfRef<>(it), stream.isParallel()).onClose(stream::close);
-    }
 
     I it;
     int index, fence;
@@ -75,8 +43,7 @@ import static one.util.streamex.StreamExInternals.*;
     }
 
     int getN() {
-        int n = fence + BATCH_UNIT;
-        return n > MAX_BATCH ? MAX_BATCH : n;
+        return Math.min(fence + BATCH_UNIT, MAX_BATCH);
     }
 
     S correctSize(S prefix) {

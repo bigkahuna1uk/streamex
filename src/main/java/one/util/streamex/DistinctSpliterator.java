@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
-import static one.util.streamex.StreamExInternals.*;
+import static one.util.streamex.Internals.Box;
 
 /* package */final class DistinctSpliterator<T> extends Box<T> implements Spliterator<T> {
     private final Spliterator<T> source;

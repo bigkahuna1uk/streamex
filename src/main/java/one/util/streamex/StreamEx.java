@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +15,6 @@
  */
 package one.util.streamex;
 
-import one.util.streamex.PairSpliterator.PSOfRef;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.Reader;
@@ -26,13 +24,37 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
 import java.util.AbstractMap.SimpleImmutableEntry;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.NavigableMap;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.SortedMap;
+import java.util.Spliterator;
+import java.util.Spliterators;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.function.*;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
+import java.util.function.BiPredicate;
+import java.util.function.BinaryOperator;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 import java.util.regex.Pattern;
 import java.util.stream.BaseStream;
 import java.util.stream.Collector;
@@ -40,7 +62,14 @@ import java.util.stream.Collector.Characteristics;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static one.util.streamex.StreamExInternals.*;
+import static one.util.streamex.Internals.Box;
+import static one.util.streamex.Internals.ObjLongBox;
+import static one.util.streamex.Internals.PairBox;
+import static one.util.streamex.Internals.alwaysTrue;
+import static one.util.streamex.Internals.checkLength;
+import static one.util.streamex.Internals.checkNonNegative;
+import static one.util.streamex.Internals.intSize;
+import static one.util.streamex.Internals.selectFirst;
 
 /**
  * A {@link Stream} implementation with additional functionality.
@@ -55,7 +84,7 @@ import static one.util.streamex.StreamExInternals.*;
  *
  * @param <T> the type of the stream elements
  */
-public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
+public final class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
 
     StreamEx(Stream<? extends T> stream, StreamContext context) {
         super(stream, context);
@@ -688,7 +717,7 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
      *        reduction
      * @return a {@code Map<Boolean, List<T>>} which {@link Boolean#TRUE} key is
      *         mapped to the result of downstream {@code Collector} collecting
-     *         the the stream elements for which predicate is true and
+     *         the stream elements for which predicate is true and
      *         {@link Boolean#FALSE} key is mapped to the result of downstream
      *         {@code Collector} collecting the other stream elements.
      *
@@ -806,13 +835,13 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
      */
     @SuppressWarnings("unchecked")
     public <A> A[] toArray(Class<A> elementClass) {
-        return stream().toArray(size -> (A[])Array.newInstance(elementClass, size));
+        return stream().toArray(size -> (A[]) Array.newInstance(elementClass, size));
     }
 
     /**
      * Returns an array containing all the stream elements. If the stream
      * happens to contain no elements, the supplied empty array is returned
-     * instead. Otherwise the new array is allocated which element type is the
+     * instead. Otherwise, the new array is allocated, whose element type is the
      * same as the element type of supplied empty array.
      * 
      * <p>
@@ -822,7 +851,7 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
      * <p>
      * This method is useful when the stream is expected to return empty arrays
      * often, so the same instance of empty array (presumably declared in some
-     * static final field) can be reused.
+     * {@code static final} field) can be reused.
      * 
      * @param <A> the element type of the resulting array
      * @param emptyArray an empty array of the resulting type
@@ -836,7 +865,7 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
      */
     @SuppressWarnings("unchecked")
     public <A> A[] toArray(A[] emptyArray) {
-        if(emptyArray.length != 0) {
+        if (emptyArray.length != 0) {
             throw new IllegalArgumentException("Empty array must be supplied");
         }
         return stream().toArray(size -> size == 0 ? emptyArray
@@ -917,6 +946,10 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
      * <p>
      * For parallel stream the concurrent {@code Map} is created.
      *
+     * <p>
+     * Use {@link #valuesToMap(Function)} if this stream contains values,
+     * instead of keys.
+     *
      * @param <V> the output type of the value mapping function
      * @param valMapper a mapping function to produce values
      * @return a {@code Map} whose keys are elements from this stream and values
@@ -957,6 +990,7 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
      * @see Collectors#toMap(Function, Function)
      * @see Collectors#toConcurrentMap(Function, Function)
      * @see #toMap(Function)
+     * @see #valuesToMap(Function)
      */
     public <K, V> Map<K, V> toMap(Function<? super T, ? extends K> keyMapper, Function<? super T, ? extends V> valMapper) {
         Map<K, V> map = isParallel() ? new ConcurrentHashMap<>() : new HashMap<>();
@@ -1001,7 +1035,37 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
             Function<? super T, ? extends V> valMapper, BinaryOperator<V> mergeFunction) {
         return rawCollect(Collectors.toMap(keyMapper, valMapper, mergeFunction, HashMap::new));
     }
-    
+
+    /**
+     * Returns a {@link Map} whose values are elements from this stream and keys
+     * are the result of applying the provided mapping functions to the input
+     * elements.
+     *
+     * <p>
+     * This is a <a href="package-summary.html#StreamOps">terminal</a>
+     * operation.
+     *
+     * <p>
+     * Returned {@code Map} is guaranteed to be modifiable.
+     *
+     * <p>
+     * For parallel stream the concurrent {@code Map} is created.
+     *
+     * @param <K> the output type of the key mapping function
+     * @param keyMapper a mapping function to produce keys
+     * @return a {@code Map} whose values are elements from this stream and keys
+     *         are the result of applying mapping function to the input elements
+     * @throws IllegalStateException if this stream contains duplicate objects
+     *         (according to {@link Object#equals(Object)})
+     * @see Collectors#toMap(Function, Function)
+     * @see Collectors#toConcurrentMap(Function, Function)
+     * @see #toMap(Function, Function)
+     * @since 0.8.0
+     */
+    public <K> Map<K, T> valuesToMap(Function<? super T, ? extends K> keyMapper) {
+        return toMap(keyMapper, Function.identity());
+    }
+
     /**
      * Drains the stream content into the supplied collection.
      * 
@@ -1027,9 +1091,9 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
         } else {
             Spliterator<T> spltr = spliterator();
             if (collection instanceof ArrayList) {
-                long size = spltr.getExactSizeIfKnown();
-                if (size >= 0 && size < Integer.MAX_VALUE - collection.size())
-                    ((ArrayList<?>) collection).ensureCapacity((int) (collection.size() + size));
+                int size = intSize(spltr);
+                if (size > 0 && size <= Integer.MAX_VALUE - collection.size())
+                    ((ArrayList<?>) collection).ensureCapacity(collection.size() + size);
             }
             spltr.forEachRemaining(collection::add);
         }
@@ -1055,6 +1119,10 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
      *
      * <p>
      * Returned {@code SortedMap} is guaranteed to be modifiable.
+     *
+     * <p>
+     * Use {@link #valuesToSortedMap(Function)} if this stream contains values,
+     * instead of keys.
      *
      * @param <V> the output type of the value mapping function
      * @param valMapper a mapping function to produce values
@@ -1101,6 +1169,7 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
      * @see Collectors#toMap(Function, Function)
      * @see Collectors#toConcurrentMap(Function, Function)
      * @see #toSortedMap(Function)
+     * @see #valuesToSortedMap(Function) 
      * @see #toNavigableMap(Function, Function)
      * @since 0.1.0
      */
@@ -1148,7 +1217,39 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
             Function<? super T, ? extends V> valMapper, BinaryOperator<V> mergeFunction) {
         return rawCollect(Collectors.toMap(keyMapper, valMapper, mergeFunction, TreeMap::new));
     }
-    
+
+    /**
+     * Returns a {@link SortedMap} whose values are elements from this stream and keys
+     * are the result of applying the provided mapping functions to the input
+     * elements.
+     *
+     * <p>
+     * This is a <a href="package-summary.html#StreamOps">terminal</a>
+     * operation.
+     *
+     * <p>
+     * If the mapped keys contains duplicates (according to
+     * {@link Object#equals(Object)}), an {@code IllegalStateException} is
+     * thrown when the collection operation is performed.
+     *
+     * <p>
+     * Returned {@code SortedMap} is guaranteed to be modifiable.
+     *
+     * @param <K> the output type of the key mapping function
+     * @param keyMapper a mapping function to produce keys
+     * @return a {@code Map} whose values are elements from this stream and keys
+     *         are the result of applying mapping function to the input elements
+     * @throws IllegalStateException if this stream contains duplicate objects
+     *         (according to {@link Object#equals(Object)})
+     * @see Collectors#toMap(Function, Function)
+     * @see Collectors#toConcurrentMap(Function, Function)
+     * @see #toSortedMap(Function, Function)
+     * @since 0.8.0
+     */
+    public <K> SortedMap<K, T> valuesToSortedMap(Function<? super T, ? extends K> keyMapper) {
+        return toSortedMap(keyMapper, Function.identity());
+    }
+
     /**
      * Returns a {@link NavigableMap} whose keys are elements from this stream and
      * values are the result of applying the provided mapping functions to the
@@ -1168,6 +1269,10 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
      *
      * <p>
      * Returned {@code NavigableMap} is guaranteed to be modifiable.
+     *
+     * <p>
+     * Use {@link #valuesToNavigableMap(Function)} if this stream contains values,
+     * instead of keys.
      *
      * @param <V> the output type of the value mapping function
      * @param valMapper a mapping function to produce values
@@ -1213,6 +1318,7 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
      * @see Collectors#toMap(Function, Function)
      * @see Collectors#toConcurrentMap(Function, Function)
      * @see #toNavigableMap(Function)
+     * @see #valuesToNavigableMap(Function) 
      * @since 0.6.5
      */
     public <K, V> NavigableMap<K, V> toNavigableMap(Function<? super T, ? extends K> keyMapper,
@@ -1259,7 +1365,40 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
             Function<? super T, ? extends V> valMapper, BinaryOperator<V> mergeFunction) {
         return rawCollect(Collectors.toMap(keyMapper, valMapper, mergeFunction, TreeMap::new));
     }
-    
+
+    /**
+     * Returns a {@link NavigableMap} whose values are elements from this stream and keys
+     * are the result of applying the provided mapping functions to the input
+     * elements.
+     *
+     * <p>
+     * This is a <a href="package-summary.html#StreamOps">terminal</a>
+     * operation.
+     *
+     * <p>
+     * If the mapped keys contains duplicates (according to
+     * {@link Object#equals(Object)}), the value mapping function is applied to
+     * each equal element, and the results are merged using the provided merging
+     * function.
+     *
+     * <p>
+     * Returned {@code NavigableMap} is guaranteed to be modifiable.
+     *
+     * @param <K> the output type of the key mapping function
+     * @param keyMapper a mapping function to produce keys
+     * @return a {@code Map} whose values are elements from this stream and keys
+     *         are the result of applying mapping function to the input elements
+     * @throws IllegalStateException if this stream contains duplicate objects
+     *         (according to {@link Object#equals(Object)})
+     * @see Collectors#toMap(Function, Function)
+     * @see Collectors#toConcurrentMap(Function, Function)
+     * @see #toNavigableMap(Function, Function) 
+     * @since 0.8.0
+     */
+    public <K> NavigableMap<K, T> valuesToNavigableMap(Function<? super T, ? extends K> keyMapper) {
+        return toNavigableMap(keyMapper, Function.identity());
+    }
+
     /**
      * Returns a new {@code StreamEx} which is a concatenation of this stream
      * and the supplied values.
@@ -1373,15 +1512,15 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
     }
 
     /**
-     * Returns a stream which contents is the same as this stream, except the case when
-     * this stream is empty. In this case its contents is replaced with supplied values.
+     * Returns a stream whose content is the same as this stream, except the case when
+     * this stream is empty. In this case, its contents is replaced with supplied values.
      *
      * <p>
      * This is a <a href="package-summary.html#StreamOps">quasi-intermediate
      * operation</a>.
      *
      * @param values values to replace the contents of this stream if this stream is empty.
-     * @return the stream which contents is replaced by supplied values only if this stream is empty.
+     * @return the stream whose content is replaced by supplied values only if this stream is empty.
      * @since 0.6.6
      */
     @SafeVarargs
@@ -1492,29 +1631,6 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
     }
 
     /**
-     * Returns a stream consisting of the results of applying the given function
-     * to the every adjacent pair of elements of this stream.
-     *
-     * <p>
-     * This is a <a href="package-summary.html#StreamOps">quasi-intermediate</a>
-     * operation.
-     * 
-     * <p>
-     * The output stream will contain one element less than this stream. If this
-     * stream contains zero or one element the output stream will be empty.
-     *
-     * @param <R> The element type of the new stream
-     * @param mapper a non-interfering, stateless function to apply to each
-     *        adjacent pair of this stream elements.
-     * @return the new stream
-     * @since 0.2.1
-     */
-    public <R> StreamEx<R> pairMap(BiFunction<? super T, ? super T, ? extends R> mapper) {
-        PSOfRef<T, R> spliterator = new PairSpliterator.PSOfRef<>(mapper, spliterator());
-        return new StreamEx<>(spliterator, context);
-    }
-
-    /**
      * Performs an action for each adjacent pair of elements of this stream.
      *
      * <p>
@@ -1522,7 +1638,7 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
      * operation.
      *
      * <p>
-     * The behavior of this operation is explicitly nondeterministic. For
+     * The behavior of this operation is explicitly non-deterministic. For
      * parallel stream pipelines, this operation does <em>not</em> guarantee to
      * respect the encounter order of the stream, as doing so would sacrifice
      * the benefit of parallelism. For any given element, the action may be
@@ -1622,7 +1738,7 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
      * <p>
      * Note that this operation always tests the adjacent pairs of input
      * elements. In some scenarios it's desired to test every element with the
-     * first element of the current series. In this case consider using
+     * first element of the current series. In this case, consider using
      * {@link MoreCollectors#dominators(BiPredicate)} collector instead.
      * 
      * <p>
@@ -1751,16 +1867,17 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
 
     /**
      * Returns a stream consisting of the results of applying the given function
-     * to the the first element and every other element of this stream.
+     * to the first element and every single element of this stream.
+     * When the mapper is called for the first element of the resulting stream,
+     * both its arguments are the same and equal to the first element of this stream.
      * 
      * <p>
      * This is a <a href="package-summary.html#StreamOps">quasi-intermediate
      * operation</a>.
      * 
      * <p>
-     * The size of the resulting stream is one element less than the input
-     * stream. If the input stream is empty or contains just one element, then
-     * the output stream will be empty.
+     * The size of the resulting stream is exactly the same as the size of the input
+     * stream.
      *
      * @param <R> The element type of the new stream
      * @param mapper a non-interfering, stateless function to apply to the first
@@ -1778,16 +1895,16 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
     /**
      * Creates an {@link EntryStream} consisting of the {@link Entry} objects
      * which keys are all the same and equal to the first element of this stream
-     * and values are the rest elements of this stream.
+     * and values are the original elements of this stream. The first element
+     * of the resulting stream has the same key and value.
      * 
      * <p>
      * This is a <a href="package-summary.html#StreamOps">quasi-intermediate
      * operation</a>.
      * 
      * <p>
-     * The size of the resulting stream is one element less than the input
-     * stream. If the input stream is empty or contains just one element, then
-     * the output stream will be empty.
+     * The size of the resulting stream is exactly the same as the size of the input
+     * stream.
      *
      * @return the new stream
      * @see #withFirst(BiFunction)
@@ -1912,7 +2029,7 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
      * @since 0.5.5
      */
     public <V> EntryStream<T, V> zipWith(Stream<V> other) {
-        return zipWith((BaseStream<V, ?>)other);
+        return zipWith((BaseStream<V, ?>) other);
     }
 
     /**
@@ -1966,7 +2083,7 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
      * <p>
      * The mapper function is not applied when the input stream is empty. This
      * operation is equivalent to {@code headTail(mapper, () -> null)}.
-     * Otherwise it's applied at most once during the stream terminal operation
+     * Otherwise, it's applied at most once during the stream terminal operation
      * execution. Sometimes it's useful to generate stream recursively like
      * this:
      * 
@@ -1989,7 +2106,7 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
      * This operation might perform badly with parallel streams. Sometimes the
      * same semantics could be expressed using other operations like
      * {@link #withFirst(BiFunction)} or {@link #mapFirst(Function)} which
-     * parallelize better. Consider using these methods if its possible in your
+     * parallelize better. Consider using these methods if it's possible in your
      * case.
      *
      * @param <R> The element type of the new stream
@@ -2046,7 +2163,7 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
      * This operation might perform badly with parallel streams. Sometimes the
      * same semantics could be expressed using other operations like
      * {@link #withFirst(BiFunction)} or {@link #mapFirst(Function)} which
-     * parallelize better. Consider using these methods if its possible in your
+     * parallelize better. Consider using these methods if it's possible in your
      * case.
      *
      * @param <R> The element type of the new stream
@@ -2184,7 +2301,6 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
      */
     public static <T> StreamEx<T> of(Stream<T> stream) {
         if (stream instanceof AbstractStreamEx) {
-            @SuppressWarnings("unchecked")
             AbstractStreamEx<T, ?> ase = (AbstractStreamEx<T, ?>) stream;
             if (ase.spliterator != null)
                 return new StreamEx<>(ase.spliterator(), ase.context);
@@ -2313,7 +2429,7 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
      * @see BufferedReader#lines()
      */
     public static StreamEx<String> ofLines(BufferedReader reader) {
-        return of(UnknownSizeSpliterator.optimize(reader.lines()));
+        return new StreamEx<>(reader.lines(), StreamContext.SEQUENTIAL);
     }
 
     /**
@@ -2348,7 +2464,7 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
     public static StreamEx<String> ofLines(Reader reader) {
         if (reader instanceof BufferedReader)
             return ofLines((BufferedReader) reader);
-        return of(UnknownSizeSpliterator.optimize(new BufferedReader(reader).lines()));
+        return ofLines(new BufferedReader(reader));
     }
 
     /**
@@ -2378,7 +2494,7 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
      * @see Files#lines(Path)
      */
     public static StreamEx<String> ofLines(Path path) throws IOException {
-        return of(UnknownSizeSpliterator.optimize(Files.lines(path)));
+        return of(Files.lines(path));
     }
 
     /**
@@ -2411,7 +2527,7 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
      * @since 0.5.0
      */
     public static StreamEx<String> ofLines(Path path, Charset charset) throws IOException {
-        return of(UnknownSizeSpliterator.optimize(Files.lines(path, charset)));
+        return of(Files.lines(path, charset));
     }
 
     /**
@@ -2564,7 +2680,7 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
     public static StreamEx<String> split(CharSequence str, Pattern pattern) {
         if (str.length() == 0)
             return of("");
-        return of(UnknownSizeSpliterator.optimize(pattern.splitAsStream(str)));
+        return new StreamEx<>(pattern.splitAsStream(str), StreamContext.SEQUENTIAL);
     }
 
     /**
@@ -2587,19 +2703,28 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
         if (str.length() == 0)
             return of("");
         if (regex.isEmpty()) {
-            return IntStreamEx.ofChars(str).mapToObj(ch -> new String(new char[] { (char) ch }));
+            return IntStreamEx.ofChars(str).mapToObj(ch -> String.valueOf((char)ch));
         }
         char ch = regex.charAt(0);
-        if (regex.length() == 1 && ".$|()[{^?*+\\".indexOf(ch) == -1) {
+        if (regex.length() == 1 && isNotRegexSpecialCaseStarter(ch)) {
             return split(str, ch);
         } else if (regex.length() == 2 && ch == '\\') {
             ch = regex.charAt(1);
-            if ((ch < '0' || ch > '9') && (ch < 'A' || ch > 'Z') && (ch < 'a' || ch > 'z')
-                && (ch < Character.MIN_HIGH_SURROGATE || ch > Character.MAX_LOW_SURROGATE)) {
+            if (isTransparentlyQuotableCharacter(ch)) {
                 return split(str, ch);
             }
         }
-        return of(UnknownSizeSpliterator.optimize(Pattern.compile(regex).splitAsStream(str)));
+        return new StreamEx<>(Pattern.compile(regex).splitAsStream(str), StreamContext.SEQUENTIAL);
+    }
+
+    private static boolean isNotRegexSpecialCaseStarter(char ch) {
+        /* @see java.util.regex.Pattern#atom() */
+        return ".$|()[{^?*+\\".indexOf(ch) == -1;
+    }
+
+    private static boolean isTransparentlyQuotableCharacter(char ch) {
+        /* @see java.util.regex.Pattern#escape(boolean,boolean,boolean) */
+        return (ch < '0' || ch > '9') && (ch < 'A' || ch > 'Z') && (ch < 'a' || ch > 'z');
     }
 
     /**
@@ -2672,13 +2797,13 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
      *
      * @param <T> the type of stream elements
      * @param seed the initial element
-     * @param f a function to be applied to to the previous element to produce a
+     * @param f a function to be applied to the previous element to produce a
      *        new element
      * @return a new sequential {@code StreamEx}
      * @see #iterate(Object, Predicate, UnaryOperator)
      */
     public static <T> StreamEx<T> iterate(final T seed, final UnaryOperator<T> f) {
-        return iterate(seed, x -> true, f);
+        return iterate(seed, alwaysTrue(), f);
     }
 
     /**
@@ -2699,7 +2824,7 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
      *
      * <p>
      * The resulting sequence may be empty if the predicate does not hold on the
-     * seed value. Otherwise the first element will be the supplied seed value,
+     * seed value. Otherwise, the first element will be the supplied seed value,
      * the next element (if present) will be the result of applying the function
      * f to the seed value, and so on iteratively until the predicate indicates
      * that the stream should terminate.
@@ -2807,7 +2932,7 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
      * 
      * @param <T> the type of the resulting stream elements
      * @param producer a predicate which calls the passed consumer to emit
-     *        stream element(s) and returns true if it producer should be
+     *        stream element(s) and returns true if its producer should be
      *        applied again.
      * @return the new stream
      * @since 0.6.0
@@ -2964,7 +3089,7 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
      */
     public static <T> StreamEx<T> ofTree(T root, Function<T, Stream<T>> mapper) {
         TreeSpliterator<T, T> spliterator = new TreeSpliterator.Plain<>(root, mapper);
-        return new StreamEx<>(spliterator, StreamContext.SEQUENTIAL.onClose(spliterator::close));
+        return new StreamEx<>(spliterator, StreamContext.SEQUENTIAL.onClose(spliterator));
     }
 
     /**
@@ -2980,7 +3105,7 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
      * method of the resulting stream returned by {@code ofTree()}.
      * 
      * @param <T> the base type of tree nodes
-     * @param <TT> the sub-type of composite tree nodes which may have children
+     * @param <TT> the subtype of composite tree nodes which may have children
      * @param root root node of the tree
      * @param collectionClass a class representing the composite tree node
      * @param mapper a non-interfering, stateless function to apply to each
@@ -3097,7 +3222,7 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
 
     /**
      * Returns a new {@code StreamEx} which elements are results of reduction of
-     * all possible tuples composed from the elements of supplied collection of
+     * all possible tuples composed of the elements of supplied collection of
      * collections. The whole stream forms an n-fold Cartesian product (or
      * cross-product) of the input collections.
      * 
@@ -3116,7 +3241,7 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
      * </pre>
      * 
      * <p>
-     * However it may perform much faster as partial reduction results are
+     * However, it may perform much faster as partial reduction results are
      * reused.
      * 
      * <p>
@@ -3179,7 +3304,7 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
 
     /**
      * Returns a new {@code StreamEx} which elements are results of reduction of
-     * all possible n-tuples composed from the elements of supplied collections.
+     * all possible n-tuples composed of the elements of supplied collections.
      * The whole stream forms an n-fold Cartesian product of input collection
      * with itself or n-ary Cartesian power of the input collection.
      * 
@@ -3198,7 +3323,7 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
      * </pre>
      * 
      * <p>
-     * However it may perform much faster as partial reduction results are
+     * However, it may perform much faster as partial reduction results are
      * reused.
      * 
      * <p>
@@ -3269,7 +3394,7 @@ public class StreamEx<T> extends AbstractStreamEx<T, StreamEx<T>> {
          * might be buffered consuming additional memory.
          * 
          * <p>
-         * It's allowed not to emit anything (don't call the consumer). However
+         * It's allowed not to emit anything (don't call the consumer). However,
          * if you do this and return new emitter which also does not emit
          * anything, you will end up in endless loop.
          * 

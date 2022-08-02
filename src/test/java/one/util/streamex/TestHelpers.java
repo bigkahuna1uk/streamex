@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2020 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,10 +15,17 @@
  */
 package one.util.streamex;
 
-import org.junit.ComparisonFailure;
-
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
+import java.util.Random;
+import java.util.Set;
+import java.util.Spliterator;
+import java.util.Spliterators;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -26,19 +33,30 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntConsumer;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
-import static one.util.streamex.StreamExInternals.TailSpliterator;
-import static one.util.streamex.StreamExInternals.finished;
-import static org.junit.Assert.*;
+import org.junit.ComparisonFailure;
+
+import static one.util.streamex.Internals.TailSpliterator;
+import static one.util.streamex.Internals.finished;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * @author Tagir Valeev
  */
 public class TestHelpers {
+
     enum Mode {
         NORMAL, SPLITERATOR, PARALLEL, APPEND, PREPEND, RANDOM
     }
@@ -79,7 +97,7 @@ public class TestHelpers {
         }
     }
 
-    static class StreamExSupplier<T> extends StreamSupplier<T> {
+    public static class StreamExSupplier<T> extends StreamSupplier<T> {
 
         public StreamExSupplier(Supplier<Stream<T>> base, Mode mode) {
             super(base, mode);
@@ -87,13 +105,13 @@ public class TestHelpers {
 
         @Override
         public StreamEx<T> get() {
-            if(mode == Mode.SPLITERATOR)
+            if (mode == Mode.SPLITERATOR)
                 return StreamEx.of(base.get().spliterator());
             return StreamEx.of(super.get());
         }
     }
 
-    static class EntryStreamSupplier<K, V> extends StreamSupplier<Map.Entry<K, V>> {
+    public static class EntryStreamSupplier<K, V> extends StreamSupplier<Map.Entry<K, V>> {
 
         public EntryStreamSupplier(Supplier<Stream<Map.Entry<K, V>>> base, Mode mode) {
             super(base, mode);
@@ -105,7 +123,20 @@ public class TestHelpers {
         }
     }
 
-    static <T> List<StreamExSupplier<T>> streamEx(Supplier<Stream<T>> base) {
+    public static class Point {
+        public final double x, y;
+
+        public Point(double x, double y) {
+            this.x = x;
+            this.y = y;
+        }
+
+        public double distance(Point o) {
+            return Math.sqrt((x - o.x) * (x - o.x) + (y - o.y) * (y - o.y));
+        }
+    }
+
+    public static <T> List<StreamExSupplier<T>> streamEx(Supplier<Stream<T>> base) {
         return StreamEx.of(Mode.values()).map(mode -> new StreamExSupplier<>(base, mode)).toList();
     }
 
@@ -115,7 +146,7 @@ public class TestHelpers {
      * 
      * @param cons consumer to run
      */
-    static void withRandom(Consumer<Random> cons) {
+    public static void withRandom(Consumer<Random> cons) {
         long seed = ThreadLocalRandom.current().nextLong();
         withRandom(seed, cons);
     }
@@ -127,9 +158,9 @@ public class TestHelpers {
      * @param seed random seed to use
      * @param cons consumer to run
      */
-    static void withRandom(long seed, Consumer<Random> cons) {
+    public static void withRandom(long seed, Consumer<Random> cons) {
         Random random = new Random(seed);
-        withMessage("Using new Random("+seed+")", () -> cons.accept(random));
+        withMessage("Using new Random(" + seed + ")", () -> cons.accept(random));
     }
     
     /**
@@ -155,24 +186,33 @@ public class TestHelpers {
         }
     }
 
-    static void repeat(int times, IntConsumer consumer) {
+    public static void repeat(int times, IntConsumer consumer) {
         for (int i = 1; i <= times; i++) {
             int finalI = i;
             withMessage("#" + i, () -> consumer.accept(finalI));
         }
     }
 
-    static <T> void streamEx(Supplier<Stream<T>> base, Consumer<StreamExSupplier<T>> consumer) {
+    public static <T> void streamEx(Supplier<Stream<T>> base, Consumer<StreamExSupplier<T>> consumer) {
         for (StreamExSupplier<T> supplier : StreamEx.of(Mode.values()).map(mode -> new StreamExSupplier<>(base, mode))) {
             withMessage(supplier.toString(), () -> consumer.accept(supplier));
         }
     }
 
-    static <T> void emptyStreamEx(Class<T> clazz, Consumer<StreamExSupplier<T>> consumer) {
+    public static void intStreamEx(Supplier<IntStream> base, Consumer<IntStreamEx> consumer) {
+        streamEx(() -> base.get().boxed(), s -> consumer.accept(s.get().mapToInt(x -> x)));
+    }
+
+    public static void longStreamEx(Supplier<LongStream> base, Consumer<LongStreamEx> consumer) {
+        streamEx(() -> base.get().boxed(), s -> consumer.accept(s.get().mapToLong(x -> x)));
+    }
+
+    public static <T> void emptyStreamEx(Class<T> clazz, Consumer<StreamExSupplier<T>> consumer) {
         streamEx(Stream::<T>empty, consumer);
     }
 
-    static <K, V> void entryStream(Supplier<Stream<Map.Entry<K, V>>> base, Consumer<EntryStreamSupplier<K, V>> consumer) {
+    public static <K, V> void entryStream(Supplier<Stream<Map.Entry<K, V>>> base,
+        Consumer<EntryStreamSupplier<K, V>> consumer) {
         for (EntryStreamSupplier<K, V> supplier : StreamEx.of(Mode.values()).map(
             mode -> new EntryStreamSupplier<>(base, mode))) {
             withMessage(supplier.toString(), () -> consumer.accept(supplier));
@@ -234,20 +274,20 @@ public class TestHelpers {
         }
     }
 
-    static <T, R> void checkCollectorEmpty(String message, R expected, Collector<T, ?, R> collector) {
+    public static <T, R> void checkCollectorEmpty(String message, R expected, Collector<T, ?, R> collector) {
         if (finished(collector) != null)
             checkShortCircuitCollector(message, expected, 0, Stream::empty, collector);
         else
             checkCollector(message, expected, Stream::empty, collector);
     }
 
-    static <T, TT extends T, R> void checkShortCircuitCollector(String message, R expected,
-            int expectedConsumedElements, Supplier<Stream<TT>> base, Collector<T, ?, R> collector) {
+    public static <T, TT extends T, R> void checkShortCircuitCollector(String message, R expected,
+        int expectedConsumedElements, Supplier<Stream<TT>> base, Collector<T, ?, R> collector) {
         checkShortCircuitCollector(message, expected, expectedConsumedElements, base, collector, false);
     }
 
-    static <T, TT extends T, R> void checkShortCircuitCollector(String message, R expected,
-            int expectedConsumedElements, Supplier<Stream<TT>> base, Collector<T, ?, R> collector, boolean skipIdentity) {
+    public static <T, TT extends T, R> void checkShortCircuitCollector(String message, R expected,
+        int expectedConsumedElements, Supplier<Stream<TT>> base, Collector<T, ?, R> collector, boolean skipIdentity) {
         assertNotNull(message, finished(collector));
         Collector<T, ?, R> withIdentity = Collectors.collectingAndThen(collector, Function.identity());
         for (StreamExSupplier<TT> supplier : streamEx(base)) {
@@ -261,8 +301,8 @@ public class TestHelpers {
         }
     }
 
-    static <T, TT extends T, R> void checkCollector(String message, R expected, Supplier<Stream<TT>> base,
-            Collector<T, ?, R> collector) {
+    public static <T, TT extends T, R> void checkCollector(String message, R expected, Supplier<Stream<TT>> base,
+        Collector<T, ?, R> collector) {
         // use checkShortCircuitCollector for CancellableCollector
         assertNull(message, finished(collector));
         for (StreamExSupplier<TT> supplier : streamEx(base)) {
@@ -270,7 +310,7 @@ public class TestHelpers {
         }
     }
 
-    static <T> void checkSpliterator(String msg, Supplier<Spliterator<T>> supplier) {
+    public static <T> void checkSpliterator(String msg, Supplier<Spliterator<T>> supplier) {
         List<T> expected = new ArrayList<>();
         supplier.get().forEachRemaining(expected::add);
         checkSpliterator(msg, expected, supplier);
@@ -283,12 +323,12 @@ public class TestHelpers {
      * This test is single-threaded. Its behavior is randomized, but random seed
      * will be printed in case of failure, so the results could be reproduced
      */
-    static <T> void checkSpliterator(String msg, List<T> expected, Supplier<Spliterator<T>> supplier) {
+    public static <T> void checkSpliterator(String msg, List<T> expected, Supplier<Spliterator<T>> supplier) {
         List<T> seq = new ArrayList<>();
 
         // Test characteristics
         Spliterator<T> forCharacteristics = supplier.get();
-        if(forCharacteristics.hasCharacteristics(Spliterator.SORTED)) {
+        if (forCharacteristics.hasCharacteristics(Spliterator.SORTED)) {
             forCharacteristics.getComparator(); // must not fail
         }
         assertTrue(forCharacteristics.estimateSize() >= 0);
@@ -321,13 +361,13 @@ public class TestHelpers {
         assertEquals(msg, expected, seq);
         
         // Test TailSpliterator
-        if(sequential instanceof TailSpliterator) {
+        if (sequential instanceof TailSpliterator) {
             seq.clear();
             TailSpliterator.forEachWithTail(supplier.get(), seq::add);
             assertEquals(msg, expected, seq);
             seq.clear();
             sequential = supplier.get();
-            while(sequential != null) {
+            while (sequential != null) {
                 sequential = TailSpliterator.tryAdvanceWithTail(sequential, seq::add);
             }
         }
@@ -337,7 +377,7 @@ public class TestHelpers {
         for (int i = 1; i < Math.min(4, expected.size() - 1); i++) {
             seq.clear();
             sequential = supplier.get();
-            for(int j=0; j<i; j++) assertTrue(msg, sequential.tryAdvance(seq::add));
+            for (int j = 0; j < i; j++) assertTrue(msg, sequential.tryAdvance(seq::add));
             sequential.forEachRemaining(seq::add);
             assertEquals(msg, expected, seq);
         }
@@ -355,7 +395,7 @@ public class TestHelpers {
                     if (split != null)
                         spliterators.add(idx, split);
                 }
-                List<Integer> order = IntStreamEx.ofIndices(spliterators).boxed().toList();
+                List<Integer> order = IntStreamEx.ofIndices(spliterators).boxed().toMutableList();
                 Collections.shuffle(order, r);
                 List<T> list = StreamEx.of(order).mapToEntry(idx -> {
                     Spliterator<T> s = spliterators.get(idx);
@@ -378,8 +418,8 @@ public class TestHelpers {
                     if (split != null)
                         spliterators.add(idx, split);
                 }
-                List<List<T>> results = StreamEx.<List<T>> generate(ArrayList::new).limit(spliterators.size())
-                        .toList();
+                List<List<T>> results = StreamEx.<List<T>>generate(ArrayList::new).limit(spliterators.size())
+                        .toMutableList();
                 int count = spliterators.size();
                 while (count > 0) {
                     int i;
@@ -398,21 +438,82 @@ public class TestHelpers {
         });
     }
 
-    static void checkIllegalStateException(Runnable r, String key, String value1, String value2) {
+    public static <T> void consumeElement(Spliterator<T> spliterator, T element) {
+        boolean[] consumed = {false};
+        assertTrue(spliterator.tryAdvance(x -> {
+            assertEquals(element, x);
+            consumed[0] = true;
+        }));
+        assertTrue(consumed[0]);
+    }
+
+    public static <T> void consumeElement(Spliterator<T> spliterator, Set<T> remainingElements) {
+        boolean[] consumed = {false};
+        assertTrue(spliterator.tryAdvance(x -> {
+            assertTrue(remainingElements.remove(x));
+            consumed[0] = true;
+        }));
+        assertTrue(consumed[0]);
+    }
+
+    public static void checkIllegalStateException(Runnable r, String key, String value1, String value2) {
         try {
             r.run();
             fail("no exception");
         } catch (IllegalStateException ex) {
             String exmsg = ex.getMessage();
             if (!exmsg.equals("Duplicate entry for key '" + key + "' (attempt to merge values '" + value1 + "' and '"
-                + value2 + "')")
-                && !exmsg.equals("Duplicate entry for key '" + key + "' (attempt to merge values '" + value2
-                    + "' and '" + value1 + "')")
-                && !exmsg.equals("java.lang.IllegalStateException: Duplicate entry for key '" + key
-                    + "' (attempt to merge values '" + value1 + "' and '" + value2 + "')")
-                && !exmsg.equals("java.lang.IllegalStateException: Duplicate entry for key '" + key
-                    + "' (attempt to merge values '" + value2 + "' and '" + value1 + "')"))
+                                      + value2 + "')")
+                    && !exmsg.equals("Duplicate entry for key '" + key + "' (attempt to merge values '" + value2
+                                             + "' and '" + value1 + "')")
+                    && !exmsg.equals("java.lang.IllegalStateException: Duplicate entry for key '" + key
+                                             + "' (attempt to merge values '" + value1 + "' and '" + value2 + "')")
+                    && !exmsg.equals("java.lang.IllegalStateException: Duplicate entry for key '" + key
+                                             + "' (attempt to merge values '" + value2 + "' and '" + value1 + "')"))
                 fail("wrong exception message: " + exmsg);
         }
+    }
+
+    @FunctionalInterface
+    public interface Statement {
+        void evaluate() throws Throwable;
+    }
+
+    public static void assertStatementThrows(Class<? extends Throwable> expected,
+                                             Predicate<? super String> checkExceptionAction,
+                                             Statement statement) {
+        try {
+            statement.evaluate();
+        } catch (Throwable e) {
+            if (!expected.isAssignableFrom(e.getClass())) {
+                throw new AssertionError("Unexpected exception, " +
+                        "expected<" + expected.getName() + "> " +
+                        "but was<" + e.getClass().getName() + ">", e);
+            }
+            if (!checkExceptionAction.test(e.getMessage())) {
+                fail("Unexpected exception<" + e.getMessage() + ">");
+            }
+            return;
+        }
+        fail("Expected exception: " + expected.getName());
+    }
+
+    public static <T> Spliterator<T> emptySpliteratorWithExactSize(long exactSize) {
+        return new Spliterators.AbstractSpliterator<T>(0, Spliterator.SIZED) {
+
+            @Override
+            public long getExactSizeIfKnown() {
+                return exactSize;
+            }
+
+            @Override
+            public boolean tryAdvance(Consumer<? super T> ignored) {
+                return false;
+            }
+        };
+    }
+
+    public static void checkAsString(String expected, EntryStream<?, ?> stream) {
+        assertEquals(expected, stream.join("->").joining(";"));
     }
 }

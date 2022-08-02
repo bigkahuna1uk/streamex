@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,19 +15,17 @@
  */
 package one.util.streamex;
 
-import static one.util.streamex.TestHelpers.*;
-import static org.junit.Assert.*;
-
 import java.util.Arrays;
 import java.util.Spliterator;
 
-import one.util.streamex.DoubleStreamEx;
-import one.util.streamex.IntStreamEx;
-import one.util.streamex.LongStreamEx;
-import one.util.streamex.PairSpliterator;
+import org.junit.Test;
+
 import one.util.streamex.PairSpliterator.PSOfRef;
 
-import org.junit.Test;
+import static one.util.streamex.TestHelpers.checkSpliterator;
+import static one.util.streamex.TestHelpers.withRandom;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * @author Tagir Valeev
@@ -49,21 +47,21 @@ public class PairSpliteratorTest {
             checkSpliterator("ref", IntStreamEx.of(ints, 1, ints.length).boxed().prepend(ints[0] + 2).toList(),
                 () -> new PairSpliterator.PSOfRef<>(a -> a + 2, Arrays.spliterator(ints), true));
             checkSpliterator("int", IntStreamEx.of(ints, 1, ints.length).boxed().prepend(ints[0] + 2).toList(),
-                () -> new PairSpliterator.PSOfInt((a, b) -> b, a -> a+2, Arrays.spliterator(ints), PairSpliterator.MODE_MAP_FIRST));
+                () -> new PairSpliterator.PSOfInt((a, b) -> b, a -> a + 2, Arrays.spliterator(ints), PairSpliterator.MODE_MAP_FIRST));
             checkSpliterator("long", LongStreamEx.of(longs, 1, longs.length).boxed().prepend(longs[0] + 2).toList(),
-                () -> new PairSpliterator.PSOfLong((a, b) -> b, a -> a+2, Arrays.spliterator(longs), PairSpliterator.MODE_MAP_FIRST));
-            checkSpliterator("double", DoubleStreamEx.of(doubles, 1, doubles.length).boxed().prepend(doubles[0] + 2).toList(), 
-                () -> new PairSpliterator.PSOfDouble((a, b) -> b, a -> a+2, Arrays.spliterator(doubles), PairSpliterator.MODE_MAP_FIRST));
+                () -> new PairSpliterator.PSOfLong((a, b) -> b, a -> a + 2, Arrays.spliterator(longs), PairSpliterator.MODE_MAP_FIRST));
+            checkSpliterator("double", DoubleStreamEx.of(doubles, 1, doubles.length).boxed().prepend(doubles[0] + 2).toList(),
+                () -> new PairSpliterator.PSOfDouble((a, b) -> b, a -> a + 2, Arrays.spliterator(doubles), PairSpliterator.MODE_MAP_FIRST));
             
             // mapLast
-            checkSpliterator("ref", IntStreamEx.of(ints, 0, ints.length-1).boxed().append(ints[ints.length-1] + 2).toList(),
+            checkSpliterator("ref", IntStreamEx.of(ints, 0, ints.length - 1).boxed().append(ints[ints.length - 1] + 2).toList(),
                 () -> new PairSpliterator.PSOfRef<>(a -> a + 2, Arrays.spliterator(ints), false));
-            checkSpliterator("int", IntStreamEx.of(ints, 0, ints.length-1).boxed().append(ints[ints.length-1] + 2).toList(),
-                () -> new PairSpliterator.PSOfInt((a, b) -> a, a -> a+2, Arrays.spliterator(ints), PairSpliterator.MODE_MAP_LAST));
-            checkSpliterator("long", LongStreamEx.of(longs, 0, longs.length-1).boxed().append(longs[longs.length-1] + 2).toList(),
-                () -> new PairSpliterator.PSOfLong((a, b) -> a, a -> a+2, Arrays.spliterator(longs), PairSpliterator.MODE_MAP_LAST));
-            checkSpliterator("double", DoubleStreamEx.of(doubles, 0, doubles.length-1).boxed().append(doubles[doubles.length-1] + 2).toList(),
-                () -> new PairSpliterator.PSOfDouble((a, b) -> a, a -> a+2, Arrays.spliterator(doubles), PairSpliterator.MODE_MAP_LAST));
+            checkSpliterator("int", IntStreamEx.of(ints, 0, ints.length - 1).boxed().append(ints[ints.length - 1] + 2).toList(),
+                () -> new PairSpliterator.PSOfInt((a, b) -> a, a -> a + 2, Arrays.spliterator(ints), PairSpliterator.MODE_MAP_LAST));
+            checkSpliterator("long", LongStreamEx.of(longs, 0, longs.length - 1).boxed().append(longs[longs.length - 1] + 2).toList(),
+                () -> new PairSpliterator.PSOfLong((a, b) -> a, a -> a + 2, Arrays.spliterator(longs), PairSpliterator.MODE_MAP_LAST));
+            checkSpliterator("double", DoubleStreamEx.of(doubles, 0, doubles.length - 1).boxed().append(doubles[doubles.length - 1] + 2).toList(),
+                () -> new PairSpliterator.PSOfDouble((a, b) -> a, a -> a + 2, Arrays.spliterator(doubles), PairSpliterator.MODE_MAP_LAST));
         });
     }
     

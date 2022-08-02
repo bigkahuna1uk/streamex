@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,15 +20,15 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.BaseStream;
 
-import static one.util.streamex.StreamExInternals.*;
-
 /**
  * This class controls stream execution mode (parallel/sequential), custom FJP
  * and close handlers.
- * 
+ *
+ * <p>
  * Fields are package-private and mutable, but it's forbidden to change them
- * from outside of this class.
- * 
+ * from outside this class.
+ *
+ * <p>
  * For performance reasons shared objects SEQUENTIAL and PARALLEL are used: then
  * have no custom FJP and no close handler. If custom FJP or close handler is
  * requested for shared object, a new object is created, otherwise the current
@@ -100,7 +100,7 @@ import static one.util.streamex.StreamExInternals.*;
     }
 
     static Runnable compose(Runnable r1, Runnable r2) {
-        if(r1 == null)
+        if (r1 == null)
             return r2;
         return () -> {
             try {
@@ -132,8 +132,6 @@ import static one.util.streamex.StreamExInternals.*;
     static StreamContext of(BaseStream<?, ?> stream) {
         if (stream instanceof BaseStreamEx)
             return ((BaseStreamEx<?, ?, ?, ?>) stream).context;
-        if (mustCloseStream(stream))
-            return new StreamContext(stream.isParallel()).onClose(stream::close);
-        return stream.isParallel() ? PARALLEL : SEQUENTIAL;
+        return new StreamContext(stream.isParallel()).onClose(stream::close);
     }
 }

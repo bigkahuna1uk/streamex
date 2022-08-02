@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,8 +22,12 @@ import java.util.Spliterator;
 
 import org.junit.Test;
 
-import static one.util.streamex.TestHelpers.*;
-import static org.junit.Assert.*;
+import static one.util.streamex.TestHelpers.repeat;
+import static one.util.streamex.TestHelpers.withRandom;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.fail;
 
 public class PermutationSpliteratorTest {
     private static final String PERMUTATIONS_4 = "0123,0132,0213,0231,0312,0321," + "1023,1032,1203,1230,1302,1320,"
@@ -33,6 +37,8 @@ public class PermutationSpliteratorTest {
     private static List<String> collect(Spliterator<int[]> spliterator) {
         List<String> strings = new ArrayList<>();
         spliterator.forEachRemaining(i -> strings.add(IntStreamEx.of(i).mapToObj(String::valueOf).joining()));
+        spliterator.forEachRemaining(i -> fail("Should not have any more elements"));
+        assertFalse(spliterator.tryAdvance(i -> fail("Should not have any more elements")));
         return strings;
     }
 

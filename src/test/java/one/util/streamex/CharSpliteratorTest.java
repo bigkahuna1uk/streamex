@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,13 +15,17 @@
  */
 package one.util.streamex;
 
-import static one.util.streamex.TestHelpers.*;
-import static org.junit.Assert.*;
-
 import java.util.Arrays;
 import java.util.Spliterator;
 
 import org.junit.Test;
+
+import static one.util.streamex.TestHelpers.checkSpliterator;
+import static one.util.streamex.TestHelpers.consumeElement;
+import static one.util.streamex.TestHelpers.withRandom;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 /**
  * @author Tagir Valeev
@@ -53,11 +57,29 @@ public class CharSpliteratorTest {
             String[] inputs = { ",", "abcd,e,f,gh,,,i,j,kl,,,,,,", ",", "abcdasdfgsdfgsdfgsdfgsdfgsdgdfsgs",
                     "abcdasdfgsdfgsdfgsdfgsdfgsdgdfsgs,", "abcdasdfgs,dfgsdfgsdfgsdfgsdgdfsgs",
                     "abcd,e,f,gh,,,i,j,kl,,,,,,x", "abcd,e,f,gh,,,i,j,kl,,,,,,x,",
-                    IntStreamEx.of(r, 0, 3).limit(r.nextInt(1000)+1).elements(new int[] { ',', 'a', 'b' }).charsToString() };
+                    IntStreamEx.of(r, 0, 3).limit(r.nextInt(1000) + 1).elements(new int[] { ',', 'a', 'b' }).charsToString() };
             for (String input : inputs) {
                 checkSpliterator(input, Arrays.asList(input.split(",")), () -> new CharSpliterator(input, ',', true));
                 checkSpliterator(input, Arrays.asList(input.split(",", -1)), () -> new CharSpliterator(input, ',', false));
             }
         });
+    }
+    
+    @Test
+    public void testTrySplit() {
+        String input = "a,b,c,d,e,f,g,h";
+        CharSpliterator spliterator = new CharSpliterator(input, ',', false);
+        assertEquals(-1, spliterator.getExactSizeIfKnown());
+        assertEquals(15, spliterator.estimateSize());
+        Spliterator<String> prefix = spliterator.trySplit();
+        assertEquals(7, prefix.estimateSize());
+        assertEquals(7, spliterator.estimateSize());
+        prefix = spliterator.trySplit();
+        assertEquals(3, prefix.estimateSize());
+        assertEquals(3, spliterator.estimateSize());
+        consumeElement(spliterator, "g");
+        consumeElement(spliterator, "h");
+        consumeElement(prefix, "e");
+        consumeElement(prefix, "f");
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ import java.util.function.Consumer;
     private final long fence;
 
     public PermutationSpliterator(int length) {
-        StreamExInternals.checkNonNegative("Length", length);
+        Internals.checkNonNegative("Length", length);
         if (length >= factorials.length)
             throw new IllegalArgumentException("Length " + length + " is bigger than " + factorials.length
                 + ": not supported");
@@ -92,7 +92,7 @@ import java.util.function.Consumer;
         if (remainingSize <= 1)
             return null;
         int[] newValue = value.clone();
-        long used = -1L; // clear bit = used position
+        int used = -1; // clear bit = used position
         long newRemainingSize = remainingSize / 2;
         long newPos = fence - (remainingSize -= newRemainingSize);
         long s = newPos;
@@ -102,7 +102,7 @@ import java.util.function.Consumer;
             s %= f;
             int idx = -1;
             while (rem >= 0) {
-                idx = Long.numberOfTrailingZeros(used >> (idx + 1)) + idx + 1;
+                idx = Integer.numberOfTrailingZeros(used >> (idx + 1)) + idx + 1;
                 rem--;
             }
             used &= ~(1 << idx);

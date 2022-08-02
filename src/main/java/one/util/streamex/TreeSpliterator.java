@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2017 StreamEx contributors
+ * Copyright 2015, 2019 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,20 +18,25 @@ package one.util.streamex;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.List;import java.util.Map.Entry;
+import java.util.List;
+import java.util.Map.Entry;
 import java.util.Spliterator;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
-import static one.util.streamex.StreamExInternals.*;
+import static one.util.streamex.Internals.CloneableSpliterator;
+import static one.util.streamex.Internals.ObjIntBox;
+import static one.util.streamex.Internals.PairBox;
 
 /**
  * @author Tagir Valeev
  *
  */
-/* package */ abstract class TreeSpliterator<T, U> extends CloneableSpliterator<U, TreeSpliterator<T, U>> implements Consumer<T> {
+/* package */ abstract class TreeSpliterator<T, U> extends CloneableSpliterator<U, TreeSpliterator<T, U>> 
+        implements Consumer<T>, AutoCloseable, Runnable {
+    private static final int MAX_RECURSION_DEPTH = Integer.getInteger("one.util.streamex.tree.recursiondepth", 128);
     T cur;
     List<PairBox<Spliterator<T>, Stream<T>>> spliterators;
     private Runnable closeHandler = null;
@@ -43,17 +48,17 @@ import static one.util.streamex.StreamExInternals.*;
     
     boolean advance() {
         List<PairBox<Spliterator<T>, Stream<T>>> spltrs = spliterators;
-        if(spltrs == null) {
+        if (spltrs == null) {
             spliterators = new ArrayList<>();
             return true;
         }
-        for(int lastIdx = spltrs.size()-1; lastIdx >= 0; lastIdx--) {
+        for (int lastIdx = spltrs.size() - 1; lastIdx >= 0; lastIdx--) {
             PairBox<Spliterator<T>, Stream<T>> pair = spltrs.get(lastIdx);
             Spliterator<T> spltr = pair.a;
-            if(spltr.tryAdvance(this)) {
+            if (spltr.tryAdvance(this)) {
                 return true;
             }
-            if(pair.b != null)
+            if (pair.b != null)
                 pair.b.close();
             spltrs.remove(lastIdx);
         }
@@ -61,7 +66,7 @@ import static one.util.streamex.StreamExInternals.*;
     }
 
     boolean append(Stream<T> stream) {
-        if(stream != null) {
+        if (stream != null) {
             spliterators.add(new PairBox<>(stream.spliterator(), stream));
         }
         return true;
@@ -73,28 +78,28 @@ import static one.util.streamex.StreamExInternals.*;
 
     @Override
     public Spliterator<U> trySplit() {
-        if(spliterators == null) {
+        if (spliterators == null) {
             spliterators = new ArrayList<>();
             Stream<T> stream = getStart();
-            if(stream != null) {
+            if (stream != null) {
                 spliterators.add(new PairBox<>(stream.parallel().spliterator(), null));
                 closeHandler = stream::close;
             }
             return new ConstSpliterator.OfRef<>(getStartElement(), 1, true);
         }
         int size = spliterators.size();
-        if(size != 1) {
+        if (size != 1) {
             return null;
         }
         Spliterator<T> prefix = spliterators.get(0).a.trySplit();
-        if(prefix == null)
+        if (prefix == null)
             return null;
         TreeSpliterator<T, U> clone = doClone();
         clone.size /= 2;
         this.size -= clone.size;
         clone.spliterators = new ArrayList<>();
         clone.spliterators.add(new PairBox<>(prefix, null));
-        closeHandler = StreamContext.compose(closeHandler, clone::close);
+        closeHandler = StreamContext.compose(closeHandler, clone);
         return clone;
     }
     
@@ -113,41 +118,48 @@ import static one.util.streamex.StreamExInternals.*;
         cur = t;
     }
     
-    void close() {
-        if(spliterators != null) {
+    @Override
+    public void run() {
+        close();
+    }
+    
+    @Override
+    public void close() {
+        if (spliterators != null) {
             Throwable t = null;
-            for(int i=spliterators.size()-1; i>=0; i--) {
+            for (int i = spliterators.size() - 1; i >= 0; i--) {
                 try {
                     Stream<T> stream = spliterators.get(i).b;
-                    if(stream != null)
+                    if (stream != null)
                         stream.close();
                 } catch (Error | RuntimeException e) {
-                    if(t == null)
+                    if (t == null)
                         t = e;
                     else
                         t.addSuppressed(e);
                 }
             }
-            if(closeHandler != null) {
+            if (closeHandler != null) {
                 try {
                     closeHandler.run();
                 } catch (Error | RuntimeException e) {
-                    if(t == null)
+                    if (t == null)
                         t = e;
                     else
                         t.addSuppressed(e);
                 }
             }
-            if(t instanceof RuntimeException)
-                throw (RuntimeException)t;
-            if(t instanceof Error)
-                throw (Error)t;
+            if (t instanceof RuntimeException)
+                throw (RuntimeException) t;
+            if (t instanceof Error)
+                throw (Error) t;
         }
     }
     
     static class Acceptor<T> implements Consumer<T> {
         private final Consumer<? super T> action;
         private final Function<T, Stream<T>> mapper;
+        private int depth;
         
         public Acceptor(Consumer<? super T> action, Function<T, Stream<T>> mapper) {
             this.action = action;
@@ -156,11 +168,21 @@ import static one.util.streamex.StreamExInternals.*;
     
         @Override
         public void accept(T t) {
+            if (depth > MAX_RECURSION_DEPTH) {
+                try (TreeSpliterator<T, T> spliterator = new Plain<>(t, mapper)) {
+                    do { // nothing
+                    } while (spliterator.tryAdvance(action));
+                }
+                return;
+            }
             action.accept(t);
-            try(Stream<T> stream = mapper.apply(t)) {
-                if(stream != null) {
+            depth++;
+            try (Stream<T> stream = mapper.apply(t)) {
+                if (stream != null) {
                     stream.spliterator().forEachRemaining(this);
                 }
+            } finally {
+                depth--;
             }
         }
     }
@@ -175,7 +197,7 @@ import static one.util.streamex.StreamExInternals.*;
 
         @Override
         public boolean tryAdvance(Consumer<? super T> action) {
-            if(!advance())
+            if (!advance())
                 return false;
             T e = this.cur;
             action.accept(e);
@@ -185,11 +207,11 @@ import static one.util.streamex.StreamExInternals.*;
         @Override
         public void forEachRemaining(Consumer<? super T> action) {
             Acceptor<T> acceptor = new Acceptor<>(action, mapper);
-            if(spliterators != null) {
-                for(int i=spliterators.size()-1; i>=0; i--) {
+            if (spliterators != null) {
+                for (int i = spliterators.size() - 1; i >= 0; i--) {
                     PairBox<Spliterator<T>, Stream<T>> pair = spliterators.get(i);
                     pair.a.forEachRemaining(acceptor);
-                    if(pair.b != null)
+                    if (pair.b != null)
                         pair.b.close();
                 }
             } else {
@@ -222,9 +244,16 @@ import static one.util.streamex.StreamExInternals.*;
     
         @Override
         public void accept(T t) {
+            if (depth > MAX_RECURSION_DEPTH) {
+                try (TreeSpliterator<T, Entry<Integer, T>> spliterator = new Depth<>(t, mapper, depth)) {
+                    do { // nothing
+                    } while (spliterator.tryAdvance(action));
+                }
+                return;
+            }
             action.accept(new AbstractMap.SimpleImmutableEntry<>(depth, t));
-            try(Stream<T> stream = mapper.apply(depth, t)) {
-                if(stream != null) {
+            try (Stream<T> stream = mapper.apply(depth, t)) {
+                if (stream != null) {
                     depth++;
                     stream.spliterator().forEachRemaining(this);
                     depth--;
@@ -235,31 +264,33 @@ import static one.util.streamex.StreamExInternals.*;
 
     static class Depth<T> extends TreeSpliterator<T, Entry<Integer, T>> {
         private final BiFunction<Integer, T, Stream<T>> mapper;
+        private final int initialDepth;
 
-        Depth(T root, BiFunction<Integer, T, Stream<T>> mapper) {
+        Depth(T root, BiFunction<Integer, T, Stream<T>> mapper, int depth) {
             super(root);
             this.mapper = mapper;
+            initialDepth = depth;
         }
 
         @Override
         public boolean tryAdvance(Consumer<? super Entry<Integer, T>> action) {
-            if(!advance())
+            if (!advance())
                 return false;
             T e = this.cur;
-            int depth = spliterators.size();
+            int depth = initialDepth + spliterators.size();
             action.accept(new ObjIntBox<>(e, depth));
             return append(mapper.apply(depth, e));
         }
 
         @Override
         public void forEachRemaining(Consumer<? super Entry<Integer, T>> action) {
-            DepthAcceptor<T> acceptor = new DepthAcceptor<>(action, mapper, 0);
-            if(spliterators != null) {
-                for(int i=spliterators.size()-1; i>=0; i--) {
+            DepthAcceptor<T> acceptor = new DepthAcceptor<>(action, mapper, initialDepth);
+            if (spliterators != null) {
+                for (int i = spliterators.size() - 1; i >= 0; i--) {
                     PairBox<Spliterator<T>, Stream<T>> pair = spliterators.get(i);
                     acceptor.depth = i + 1;
                     pair.a.forEachRemaining(acceptor);
-                    if(pair.b != null)
+                    if (pair.b != null)
                         pair.b.close();
                 }
             } else {
