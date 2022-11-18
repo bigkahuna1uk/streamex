@@ -536,6 +536,23 @@ public abstract class AbstractStreamEx<T, S extends AbstractStreamEx<T, S>> exte
         return stream().count();
     }
 
+    /**
+     * Counts the number of elements in the stream that satisfy the predicate.
+     *
+     * <p>
+     * This is a terminal operation.
+     *
+     * @param predicate a <a
+     *                  href="package-summary.html#NonInterference">non-interfering </a>,
+     *                  <a href="package-summary.html#Statelessness">stateless</a>
+     *                  predicate to apply to stream elements. Only elements passing
+     *                  the predicate will be counted.
+     * @return the count of elements in this stream satisfying the predicate.
+     */
+    public long count(Predicate<? super T> predicate) {
+        return filter(predicate).count();
+    }
+
     @Override
     public boolean anyMatch(Predicate<? super T> predicate) {
         if (context.fjp != null)
@@ -1896,7 +1913,7 @@ public abstract class AbstractStreamEx<T, S extends AbstractStreamEx<T, S>> exte
         Spliterator<T> spltr = spliterator();
         return supply(
             spltr.hasCharacteristics(Spliterator.ORDERED) ? new TakeDrop.TDOfRef<>(spltr, false, true, predicate)
-                    : new TakeDrop.UnorderedTDOfRef<T>(spltr, false, true, predicate));
+                    : new TakeDrop.UnorderedTDOfRef<>(spltr, false, true, predicate));
     }
 
     /**
@@ -1958,7 +1975,7 @@ public abstract class AbstractStreamEx<T, S extends AbstractStreamEx<T, S>> exte
     public S prefix(BinaryOperator<T> op) {
         Spliterator<T> spltr = spliterator();
         return supply(spltr.hasCharacteristics(Spliterator.ORDERED) ? new PrefixOps.OfRef<>(spltr, op)
-                : new PrefixOps.OfUnordRef<T>(spltr, op));
+                : new PrefixOps.OfUnordRef<>(spltr, op));
     }
 
     // Necessary to generate proper JavaDoc

@@ -15,6 +15,12 @@
  */
 package one.util.streamex.api;
 
+import one.util.streamex.IntStreamEx;
+import one.util.streamex.StreamEx;
+import org.junit.FixMethodOrder;
+import org.junit.Test;
+import org.junit.runners.MethodSorters;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -46,13 +52,6 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.IntStream.Builder;
-
-import org.junit.FixMethodOrder;
-import org.junit.Test;
-import org.junit.runners.MethodSorters;
-
-import one.util.streamex.IntStreamEx;
-import one.util.streamex.StreamEx;
 
 import static one.util.streamex.TestHelpers.checkSpliterator;
 import static one.util.streamex.TestHelpers.intStreamEx;
@@ -300,7 +299,7 @@ public class IntStreamExTest {
         assertArrayEquals(new int[] { 1, 2, 3 }, IntStreamEx.of(3, 1, 2).sorted().toArray());
         assertArrayEquals(new int[] { 1, 2, 3 }, IntStreamEx.of(1, 2, 1, 3, 2).distinct().toArray());
         assertArrayEquals(new int[] { 2, 4, 6 }, IntStreamEx.range(1, 4).map(x -> x * 2).toArray());
-        assertArrayEquals(new long[] { 2, 4, 6 }, IntStreamEx.range(1, 4).mapToLong(x -> x * 2).toArray());
+        assertArrayEquals(new long[] { 2, 4, 6 }, IntStreamEx.range(1, 4).mapToLong(x -> x * 2L).toArray());
         assertArrayEquals(new double[] { 2, 4, 6 }, IntStreamEx.range(1, 4).mapToDouble(x -> x * 2).toArray(), 0.0);
         assertArrayEquals(new int[] { 1, 3 }, IntStreamEx.range(0, 5).filter(x -> x % 2 == 1).toArray());
         assertEquals(6, IntStreamEx.of(1, 2, 3).reduce(Integer::sum).getAsInt());
@@ -801,5 +800,10 @@ public class IntStreamExTest {
         assertArrayEquals(new int[] { 1, 0, 10, 0, 100, 0, 1000 }, IntStreamEx.of(1, 10, 100, 1000).intersperse(0)
                 .toArray());
         assertEquals(0L, IntStreamEx.empty().intersperse(1).count());
+    }
+
+    @Test
+    public void testCount() {
+        assertEquals(5L, IntStreamEx.range(10).count(x -> x % 2 == 0));
     }
 }

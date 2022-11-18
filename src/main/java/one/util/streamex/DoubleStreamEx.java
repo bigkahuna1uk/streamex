@@ -85,7 +85,7 @@ public final class DoubleStreamEx extends BaseStreamEx<Double, DoubleStream, Spl
         return new DoubleStreamEx(stream, StreamContext.SEQUENTIAL);
     }
 
-    final DoubleStreamEx delegate(Spliterator.OfDouble spliterator) {
+    DoubleStreamEx delegate(Spliterator.OfDouble spliterator) {
         return new DoubleStreamEx(spliterator, context);
     }
 
@@ -1132,6 +1132,23 @@ public final class DoubleStreamEx extends BaseStreamEx<Double, DoubleStream, Spl
         if (context.fjp != null)
             return context.terminate(stream()::count);
         return stream().count();
+    }
+
+    /**
+     * Counts the number of elements in the stream that satisfy the predicate.
+     *
+     * <p>
+     * This is a terminal operation.
+     *
+     * @param predicate a <a
+     *                  href="package-summary.html#NonInterference">non-interfering </a>,
+     *                  <a href="package-summary.html#Statelessness">stateless</a>
+     *                  predicate to apply to stream elements. Only elements passing
+     *                  the predicate will be counted.
+     * @return the count of elements in this stream satisfying the predicate.
+     */
+    public long count(DoublePredicate predicate) {
+        return filter(predicate).count();
     }
 
     @Override
