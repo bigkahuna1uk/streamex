@@ -2,8 +2,14 @@
 
 Check also [MIGRATION.md](MIGRATION.md) for possible compatibility problems.
 
+### 0.8.3
+* Using Java 17 as a build JDK. Compatibility with Java 8+ stays untouched.
+* [#269] Added: `AbstractStreamEx.mapMulti` and friends.
+
 ### 0.8.2
 * [#260] Added: `count(Predicate)`
+* [#264] Improved: combiner function is optimized in `MoreCollectors.least/greatest`
+* [#268] Improved: `IntCollector.averaging/LongCollector.averaging` final result computation optimization
 
 ### 0.8.1
 * [#245] Fixed: back to 'jar' packaging

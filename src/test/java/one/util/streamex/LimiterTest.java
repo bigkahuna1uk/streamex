@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2019 StreamEx contributors
+ * Copyright 2015, 2023 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import java.util.stream.IntStream;
 
 import org.junit.Test;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
 /**
@@ -90,5 +91,21 @@ public class LimiterTest {
         assertEquals(5, limiter.size());
         Iterator<Integer> iterator = limiter.iterator();
         assertEquals(Arrays.asList(1, 2, 3, 4, 5), StreamEx.of(iterator).toList());
-    } 
+    }
+    
+    @Test
+    public void testDirectPutAll() {
+        Limiter<Integer> limiter = new Limiter<>(3, Comparator.naturalOrder());
+        Limiter<Integer> limiter2 = new Limiter<>(3, Comparator.naturalOrder());
+        limiter.put(6);
+        limiter.put(5);
+        limiter.put(4);
+        limiter2.put(3);
+        limiter2.put(1);
+        limiter2.put(0);
+        Limiter<Integer> result = limiter.putAll(limiter2);
+        result.put(2);
+        result.sort();
+        assertArrayEquals(new Object[] {0, 1, 2}, result.toArray());
+    }
 }

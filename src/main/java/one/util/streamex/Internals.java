@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2019 StreamEx contributors
+ * Copyright 2015, 2023 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -244,6 +244,10 @@ import java.util.stream.Collector.Characteristics;
             System.arraycopy(buf.data, 0, data, size, buf.size);
             size += buf.size;
         }
+        
+        IntStreamEx stream() {
+            return IntStreamEx.of(data, 0, size);
+        }
 
         int[] toArray() {
             return data.length == size ? data : Arrays.copyOfRange(data, 0, size);
@@ -277,6 +281,10 @@ import java.util.stream.Collector.Characteristics;
             size += buf.size;
         }
 
+        LongStreamEx stream() {
+            return LongStreamEx.of(data, 0, size);
+        }
+
         long[] toArray() {
             return data.length == size ? data : Arrays.copyOfRange(data, 0, size);
         }
@@ -307,6 +315,10 @@ import java.util.stream.Collector.Characteristics;
             }
             System.arraycopy(buf.data, 0, data, size, buf.size);
             size += buf.size;
+        }
+
+        DoubleStreamEx stream() {
+            return DoubleStreamEx.of(data, 0, size);
         }
 
         double[] toArray() {
@@ -835,12 +847,7 @@ import java.util.stream.Collector.Characteristics;
         public OptionalDouble result() {
             if (cnt == 0)
                 return OptionalDouble.empty();
-            if (hi == 0 && lo >= 0 || hi == -1 && lo < 0) {
-                return OptionalDouble.of(((double) lo) / cnt);
-            }
-            return OptionalDouble.of(new BigDecimal(new BigInteger(java.nio.ByteBuffer.allocate(16).order(
-                ByteOrder.BIG_ENDIAN).putLong(hi).putLong(lo).array())).divide(BigDecimal.valueOf(cnt),
-                MathContext.DECIMAL64).doubleValue());
+            return OptionalDouble.of(((double) (hi + (lo < 0 ? 1 : 0)) / cnt) * 0x1.0p64 + ((double) lo) / cnt);
         }
     }
 

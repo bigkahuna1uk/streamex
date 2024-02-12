@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2019 StreamEx contributors
+ * Copyright 2015, 2023 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -2156,7 +2156,7 @@ public final class EntryStream<K, V> extends AbstractStreamEx<Entry<K, V>, Entry
      * {@code Map.Entry(list.get(0), list.get(1))},
      * {@code Map.Entry(list.get(0), list.get(2))} and
      * {@code Map.Entry(list.get(1), list.get(2))}. The number of elements in
-     * the resulting stream is {@code list.size()*(list.size()+1L)/2}.
+     * the resulting stream is {@code list.size() * (list.size() - 1L) / 2}.
      *
      * <p>
      * The list values are accessed using {@link List#get(int)}, so the list
@@ -2185,7 +2185,7 @@ public final class EntryStream<K, V> extends AbstractStreamEx<Entry<K, V>, Entry
      * {@code Map.Entry(array[0], array[1])},
      * {@code Map.Entry(array[0], array[2])} and
      * {@code Map.Entry(array[1], array[2])}. The number of elements in the
-     * resulting stream is {@code array.length*(array.length+1L)/2}..
+     * resulting stream is {@code array.length * (array.length - 1L) / 2}..
      *
      * @param <T> type of the array elements
      * @param array a array to take the elements from
