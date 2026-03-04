@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2023 StreamEx contributors
+ * Copyright 2015, 2024 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,36 +15,17 @@
  */
 package one.util.streamex;
 
-import java.util.DoubleSummaryStatistics;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
-import java.util.OptionalDouble;
-import java.util.function.BiConsumer;
-import java.util.function.DoubleBinaryOperator;
-import java.util.function.DoubleFunction;
-import java.util.function.DoublePredicate;
-import java.util.function.DoubleUnaryOperator;
-import java.util.function.Function;
-import java.util.function.ObjDoubleConsumer;
-import java.util.function.Supplier;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+
+import java.util.*;
+import java.util.function.*;
 import java.util.stream.Collector;
 
-import static one.util.streamex.Internals.BooleanMap;
-import static one.util.streamex.Internals.Box;
-import static one.util.streamex.Internals.DoubleBuffer;
-import static one.util.streamex.Internals.DoubleCollectorImpl;
-import static one.util.streamex.Internals.FloatBuffer;
-import static one.util.streamex.Internals.ID_CHARACTERISTICS;
-import static one.util.streamex.Internals.NO_CHARACTERISTICS;
-import static one.util.streamex.Internals.PartialCollector;
-import static one.util.streamex.Internals.PrimitiveBox;
-import static one.util.streamex.Internals.UNBOX_DOUBLE;
+import static one.util.streamex.Internals.*;
 
 /**
  * A {@link Collector} specialized to work with primitive {@code double}.
- * 
- * @author Tagir Valeev
  *
  * @param <A> the mutable accumulation type of the reduction operation (often
  *        hidden as an implementation detail)
@@ -52,7 +33,8 @@ import static one.util.streamex.Internals.UNBOX_DOUBLE;
  * @see DoubleStreamEx#collect(DoubleCollector)
  * @since 0.3.0
  */
-public interface DoubleCollector<A, R> extends MergingCollector<Double, A, R> {
+@NullMarked
+public interface DoubleCollector<A extends @Nullable Object, R extends @Nullable Object> extends MergingCollector<Double, A, R> {
     /**
      * A function that folds a value into a mutable result container.
      *
@@ -84,7 +66,7 @@ public interface DoubleCollector<A, R> extends MergingCollector<Double, A, R> {
      *         by an additional finishing step
      * @since 0.3.7
      */
-    default <RR> DoubleCollector<A, RR> andThen(Function<R, RR> finisher) {
+    default <RR extends @Nullable Object> DoubleCollector<A, RR> andThen(Function<R, RR> finisher) {
         return of(supplier(), doubleAccumulator(), merger(), finisher().andThen(finisher));
     }
 
@@ -102,7 +84,9 @@ public interface DoubleCollector<A, R> extends MergingCollector<Double, A, R> {
      *        result, for the new collector
      * @return the new {@code DoubleCollector}
      */
-    static <R> DoubleCollector<R, R> of(Supplier<R> supplier, ObjDoubleConsumer<R> doubleAccumulator,
+    static <R extends @Nullable Object> DoubleCollector<R, R> of(
+            Supplier<R> supplier,
+            ObjDoubleConsumer<R> doubleAccumulator,
             BiConsumer<R, R> merger) {
         return new DoubleCollectorImpl<>(supplier, doubleAccumulator, merger, Function.identity(), ID_CHARACTERISTICS);
     }
@@ -110,14 +94,15 @@ public interface DoubleCollector<A, R> extends MergingCollector<Double, A, R> {
     /**
      * Adapts a {@code Collector} which accepts elements of type {@code Double}
      * to a {@code DoubleCollector}.
-     * 
+     *
      * @param <A> The intermediate accumulation type of the collector
      * @param <R> The final result type of the collector
      * @param collector a {@code Collector} to adapt
      * @return a {@code DoubleCollector} which behaves in the same way as input
      *         collector.
      */
-    static <A, R> DoubleCollector<?, R> of(Collector<Double, A, R> collector) {
+    static <A extends @Nullable Object, R extends @Nullable Object> DoubleCollector<?, R> of(
+            Collector<Double, A, R> collector) {
         if (collector instanceof DoubleCollector) {
             return (DoubleCollector<A, R>) collector;
         }
@@ -138,7 +123,8 @@ public interface DoubleCollector<A, R> extends MergingCollector<Double, A, R> {
      * @param <R> The final result type of the new collector
      * @return the new {@code DoubleCollector}
      */
-    static <A, R> DoubleCollector<A, R> of(Supplier<A> supplier, ObjDoubleConsumer<A> doubleAccumulator,
+    static <A extends @Nullable Object, R extends @Nullable Object> DoubleCollector<A, R> of(
+            Supplier<A> supplier, ObjDoubleConsumer<A> doubleAccumulator,
             BiConsumer<A, A> merger, Function<A, R> finisher) {
         return new DoubleCollectorImpl<>(supplier, doubleAccumulator, merger, finisher, NO_CHARACTERISTICS);
     }
@@ -158,7 +144,7 @@ public interface DoubleCollector<A, R> extends MergingCollector<Double, A, R> {
      */
     static DoubleCollector<?, String> joining(CharSequence delimiter, CharSequence prefix, CharSequence suffix) {
         return PartialCollector.joining(delimiter, prefix, suffix, true).asDouble(
-            Internals.joinAccumulatorDouble(delimiter));
+                Internals.joinAccumulatorDouble(delimiter));
     }
 
     /**
@@ -172,7 +158,7 @@ public interface DoubleCollector<A, R> extends MergingCollector<Double, A, R> {
      */
     static DoubleCollector<?, String> joining(CharSequence delimiter) {
         return PartialCollector.joining(delimiter, null, null, false).asDouble(
-            Internals.joinAccumulatorDouble(delimiter));
+                Internals.joinAccumulatorDouble(delimiter));
     }
 
     /**
@@ -205,7 +191,7 @@ public interface DoubleCollector<A, R> extends MergingCollector<Double, A, R> {
      *         elements
      */
     static DoubleCollector<?, Double> summing() {
-        // Using DoubleSummaryStatistics as Kahan algorithm is implemented there
+        // Using DoubleSummaryStatistics as the Kahan algorithm is implemented there
         return summarizing().andThen(DoubleSummaryStatistics::getSum);
     }
 
@@ -219,7 +205,7 @@ public interface DoubleCollector<A, R> extends MergingCollector<Double, A, R> {
      */
     static DoubleCollector<?, OptionalDouble> averaging() {
         return summarizing().andThen(
-            dss -> dss.getCount() == 0L ? OptionalDouble.empty() : OptionalDouble.of(dss.getAverage()));
+                dss -> dss.getCount() == 0L ? OptionalDouble.empty() : OptionalDouble.of(dss.getAverage()));
     }
 
     /**
@@ -256,7 +242,8 @@ public interface DoubleCollector<A, R> extends MergingCollector<Double, A, R> {
      *         elements and provides the mapped results to the downstream
      *         collector
      */
-    static <A, R> DoubleCollector<?, R> mapping(DoubleUnaryOperator mapper, DoubleCollector<A, R> downstream) {
+    static <A extends @Nullable Object, R extends @Nullable Object> DoubleCollector<?, R> mapping(
+            DoubleUnaryOperator mapper, DoubleCollector<A, R> downstream) {
         ObjDoubleConsumer<A> downstreamAccumulator = downstream.doubleAccumulator();
         return new DoubleCollectorImpl<>(downstream.supplier(), (r, t) -> downstreamAccumulator.accept(r, mapper
                 .applyAsDouble(t)), downstream.merger(), downstream.finisher(), downstream.characteristics());
@@ -276,7 +263,8 @@ public interface DoubleCollector<A, R> extends MergingCollector<Double, A, R> {
      *         elements and provides the mapped results to the downstream
      *         collector
      */
-    static <U, A, R> DoubleCollector<?, R> mappingToObj(DoubleFunction<U> mapper, Collector<U, A, R> downstream) {
+    static <U extends @Nullable Object, A extends @Nullable Object, R extends @Nullable Object> DoubleCollector<?, R> mappingToObj(
+            DoubleFunction<U> mapper, Collector<U, A, R> downstream) {
         BiConsumer<A, U> accumulator = downstream.accumulator();
         if (downstream instanceof MergingCollector) {
             return new DoubleCollectorImpl<>(downstream.supplier(), (acc, i) -> accumulator
@@ -327,7 +315,7 @@ public interface DoubleCollector<A, R> extends MergingCollector<Double, A, R> {
      */
     static DoubleCollector<?, Double> reducing(double identity, DoubleBinaryOperator op) {
         return of(() -> new double[] { identity }, (box, i) -> box[0] = op.applyAsDouble(box[0], i),
-            (box1, box2) -> box1[0] = op.applyAsDouble(box1[0], box2[0]), UNBOX_DOUBLE);
+                (box1, box2) -> box1[0] = op.applyAsDouble(box1[0], box2[0]), UNBOX_DOUBLE);
     }
 
     /**
@@ -376,11 +364,12 @@ public interface DoubleCollector<A, R> extends MergingCollector<Double, A, R> {
      * @return a {@code DoubleCollector} implementing the cascaded partitioning
      *         operation
      */
-    static <A, D> DoubleCollector<?, Map<Boolean, D>> partitioningBy(DoublePredicate predicate,
+    static <A extends @Nullable Object, D extends @Nullable Object> DoubleCollector<?, Map<Boolean, D>> partitioningBy(
+            DoublePredicate predicate,
             DoubleCollector<A, D> downstream) {
         ObjDoubleConsumer<A> downstreamAccumulator = downstream.doubleAccumulator();
         ObjDoubleConsumer<BooleanMap<A>> accumulator = (result, t) -> downstreamAccumulator.accept(
-            predicate.test(t) ? result.trueValue : result.falseValue, t);
+                predicate.test(t) ? result.trueValue : result.falseValue, t);
         return BooleanMap.partialCollector(downstream).asDouble(accumulator);
     }
 
@@ -433,7 +422,8 @@ public interface DoubleCollector<A, R> extends MergingCollector<Double, A, R> {
      * @return a {@code DoubleCollector} implementing the cascaded group-by
      *         operation
      */
-    static <K, D, A> DoubleCollector<?, Map<K, D>> groupingBy(DoubleFunction<? extends K> classifier,
+    static <K, D extends @Nullable Object, A extends @Nullable Object> DoubleCollector<?, Map<K, D>> groupingBy(
+            DoubleFunction<? extends K> classifier,
             DoubleCollector<A, D> downstream) {
         return groupingBy(classifier, HashMap::new, downstream);
     }
@@ -463,8 +453,10 @@ public interface DoubleCollector<A, R> extends MergingCollector<Double, A, R> {
      * @return a {@code DoubleCollector} implementing the cascaded group-by
      *         operation
      */
-    static <K, D, A, M extends Map<K, D>> DoubleCollector<?, M> groupingBy(DoubleFunction<? extends K> classifier,
-            Supplier<M> mapFactory, DoubleCollector<A, D> downstream) {
+    static <K, D extends @Nullable Object, A extends @Nullable Object, M extends Map<K, D>> DoubleCollector<?, M> groupingBy(
+            DoubleFunction<? extends K> classifier,
+            Supplier<M> mapFactory,
+            DoubleCollector<A, D> downstream) {
         Supplier<A> downstreamSupplier = downstream.supplier();
         Function<K, A> supplier = k -> downstreamSupplier.get();
         ObjDoubleConsumer<A> downstreamAccumulator = downstream.doubleAccumulator();
@@ -503,7 +495,7 @@ public interface DoubleCollector<A, R> extends MergingCollector<Double, A, R> {
      * Returns a {@code DoubleCollector} which produces a boolean array
      * containing the results of applying the given predicate to the input
      * elements, in encounter order.
-     * 
+     *
      * @param predicate a non-interfering, stateless predicate to apply to each
      *        input element. The result values of this predicate are collected
      *        to the resulting boolean array.

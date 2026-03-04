@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2023 StreamEx contributors
+ * Copyright 2015, 2024 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,13 +16,13 @@
 
 package one.util.streamex;
 
+import org.junit.Test;
+
 import java.util.List;
 import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.StreamSupport;
-
-import org.junit.Test;
 
 import static one.util.streamex.TestHelpers.checkSpliterator;
 import static org.junit.Assert.assertEquals;

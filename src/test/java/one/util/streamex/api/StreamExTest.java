@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2023 StreamEx contributors
+ * Copyright 2015, 2024 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,69 +15,25 @@
  */
 package one.util.streamex.api;
 
-import one.util.streamex.EntryStream;
-import one.util.streamex.IntStreamEx;
-import one.util.streamex.Joining;
-import one.util.streamex.MoreCollectors;
-import one.util.streamex.StreamEx;
-import one.util.streamex.TestHelpers.Point;
+import one.util.streamex.*;
+import one.util.streamex.TestHelpers.*;
+import org.jspecify.annotations.NonNull;
 import org.junit.FixMethodOrder;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runners.MethodSorters;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.Reader;
-import java.io.StringReader;
-import java.io.UncheckedIOException;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.util.AbstractList;
-import java.util.AbstractMap;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.NavigableMap;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Queue;
-import java.util.Random;
-import java.util.Set;
-import java.util.SortedMap;
-import java.util.Spliterator;
-import java.util.TreeSet;
-import java.util.Vector;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.Exchanger;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BiFunction;
-import java.util.function.BinaryOperator;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.IntPredicate;
-import java.util.function.Predicate;
-import java.util.function.Supplier;
+import java.util.function.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -87,23 +43,8 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static java.util.Arrays.asList;
-import static one.util.streamex.TestHelpers.checkIllegalStateException;
-import static one.util.streamex.TestHelpers.checkSpliterator;
-import static one.util.streamex.TestHelpers.emptySpliteratorWithExactSize;
-import static one.util.streamex.TestHelpers.emptyStreamEx;
-import static one.util.streamex.TestHelpers.repeat;
-import static one.util.streamex.TestHelpers.streamEx;
-import static one.util.streamex.TestHelpers.withRandom;
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static one.util.streamex.TestHelpers.*;
+import static org.junit.Assert.*;
 
 /**
  * @author Tagir Valeev
@@ -116,11 +57,11 @@ public class StreamExTest {
     @Test
     public void testCreate() {
         assertEquals(asList(), StreamEx.empty().toList());
-        // double test is intended
+        // a repeating test is intended: check that empty() is not a singleton and can be called twice
         assertEquals(asList(), StreamEx.empty().toList());
         assertEquals(asList("a"), StreamEx.of("a").toList());
         assertEquals(asList("a"), StreamEx.of(Optional.of("a")).toList());
-        assertEquals(asList(), StreamEx.of(Optional.ofNullable(null)).toList());
+        assertEquals(asList(), StreamEx.of(Optional.empty()).toList());
         assertEquals(asList(), StreamEx.ofNullable(null).toList());
         assertEquals(asList("a"), StreamEx.ofNullable("a").toList());
         assertEquals(asList((String) null), StreamEx.of((String) null).toList());
@@ -181,8 +122,6 @@ public class StreamExTest {
         String input = IntStreamEx.range(5000).joining("\n");
         List<String> expectedList = IntStreamEx.range(1, 5000).mapToObj(String::valueOf).toList();
         Set<String> expectedSet = IntStreamEx.range(1, 5000).mapToObj(String::valueOf).toSet();
-        // Saving actual to separate variable helps to work-around
-        // javac <8u40 issue JDK-8056984
         List<String> actualList = StreamEx.ofLines(new StringReader(input)).skip(1).parallel().toList();
         assertEquals(expectedList, actualList);
         actualList = StreamEx.ofLines(new StringReader(input)).pairMap((a, b) -> b).parallel().toList();
@@ -258,7 +197,7 @@ public class StreamExTest {
     @Test
     public void testToMutableList() {
         List<Integer> list = StreamEx.of(1, 2, 3).toMutableList();
-        // Test that returned list is mutable
+        // Test that the returned list is mutable
         List<Integer> list2 = StreamEx.of(4, 5, 6).parallel().toMutableList();
         list2.add(7);
         list.addAll(list2);
@@ -719,12 +658,6 @@ public class StreamExTest {
         List<String> input = asList("a", "bb", "ccc");
         streamEx(input::stream, supplier -> {
             assertEquals("ccc;bb;a;", supplier.get().foldLeft("", (u, v) -> v + ";" + u));
-            // Removing types here causes internal error in Javac compiler
-            // java.lang.AssertionError: attribution shouldn't be happening here
-            // Bug appears in javac 1.8.0.20 and javac 1.8.0.45
-            // javac 1.9.0b55 and ecj compiles normally
-            // Probably this ticket:
-            // https://bugs.openjdk.java.net/browse/JDK-8068399
             assertTrue(supplier.get().foldLeft(false, (Boolean acc, String s) -> acc || s.equals("bb")));
             assertFalse(supplier.get().foldLeft(false, (Boolean acc, String s) -> acc || s.equals("d")));
             assertEquals(6, (int) supplier.get().foldLeft(0, (acc, v) -> acc + v.length()));
@@ -810,8 +743,6 @@ public class StreamExTest {
         assertEquals(IntStreamEx.range(10).boxed().toList(), IntStreamEx.range(100).mapToObj(x -> x / 10).sorted()
                 .distinct(3).sorted().toList());
 
-        // Saving actual to separate variable helps to work-around
-        // javac <8u40 issue JDK-8056984
         List<String> actual = StreamEx.split("a,b,a,c,d,b,a", ",").parallel().distinct(2).sorted().toList();
         assertEquals(asList("a", "b"), actual);
     }
@@ -880,13 +811,13 @@ public class StreamExTest {
         List<Integer> res = StreamEx.of(numbers).pairMap((a, b) -> a < b ? a : null).nonNull().toList();
         assertEquals(asList(1, 15, 2), res);
 
-        // Check whether stream is sorted
+        // Check whether the stream is sorted
         assertTrue(isSorted(asList("a", "bb", "bb", "c")));
         assertFalse(isSorted(asList("a", "bb", "bb", "bba", "bb", "c")));
         withRandom(r -> assertTrue(isSorted(IntStreamEx.of(r).boxed().distinct().limit(1000).toCollection(
             TreeSet::new))));
 
-        // Find first element which violates the sorting
+        // Find the first element that violates the sorting
         assertEquals("bba", firstMisplaced(asList("a", "bb", "bb", "bba", "bb", "c")).get());
         assertFalse(firstMisplaced(asList("a", "bb", "bb", "bb", "c")).isPresent());
         assertFalse(firstMisplaced(Arrays.<String>asList()).isPresent());
@@ -1449,7 +1380,7 @@ public class StreamExTest {
                     .joining(", "));
         });
         Entry<Integer, Long> entry = StreamEx.of(input).runLengths().findFirst().get();
-        // Test qeuals contract for custom entry
+        // Test equals contract for custom entry
         assertNotEquals(entry, new Object());
         assertNotEquals(new Object(), entry);
         assertEquals(entry, new AbstractMap.SimpleImmutableEntry<>(1, 1L));
@@ -1634,7 +1565,7 @@ public class StreamExTest {
             assertEquals(asList(), s.get().dropWhile(x -> x.length() > 0).toList());
             assertEquals(asList("aaa", "b", "cccc"), s.get().dropWhile(x -> x.length() > 5).toList());
             // Saving to Optional is necessary as javac <8u40 fails to compile
-            // this without intermediate variable
+            // this without an intermediate variable
             Optional<String> opt1 = s.get().dropWhile(x -> x.length() > 1).findFirst();
             assertEquals(Optional.of("b"), opt1);
             Optional<String> opt0 = s.get().dropWhile(x -> x.length() > 0).findFirst();
@@ -2076,7 +2007,7 @@ public class StreamExTest {
      * @param stream stream to process
      * @param comparator comparator to compare stream values
      * @param stopValue value to short-circuit at
-     * @return optional describing maximal value or empty optional if input
+     * @return optional describing maximal value or empty optional if the input
      *         stream is empty
      */
     static <T> Optional<T> maxWithStop(StreamEx<T> stream, Comparator<T> comparator, T stopValue) {
@@ -2263,6 +2194,17 @@ public class StreamExTest {
     }
 
     @Test
+    public void testMapToEntryPartial() {
+        Function<Integer, Optional<String>> literalOf = num -> num == 1
+                ? Optional.of("one")
+                : Optional.empty();
+
+        List<Integer> original = asList(1, 2, 3, 4);
+        Map<Integer, String> expected = Collections.singletonMap(1, "one");
+        streamEx(original::stream, s -> assertEquals(expected, s.get().mapToEntryPartial(literalOf).toMap()));
+    }
+
+    @Test
     public void testConcurrentGroupingBy() {
         StreamEx.of("a", "b").parallel().groupingBy(String::length, secondConcurrentAddAssertingCollector("a", "b"));
         StreamEx.of("x", "y").parallel()
@@ -2301,5 +2243,22 @@ public class StreamExTest {
     @Test
     public void testCount() {
         assertEquals(3L, StreamEx.of("x", "", "y", "", "z").count(x -> !x.isEmpty()));
+    }
+    
+    @Test
+    public void testIterateUntilNull() {
+        StreamEx<@NonNull Integer> integers = StreamEx.iterateUntilNull(1, x -> x < 6 ? x + 1 : null);
+        assertEquals(asList(1, 2, 3, 4, 5, 6), integers.toList());
+        assertEquals(asList(), 
+                StreamEx.iterateUntilNull((Integer)null, x -> x < 6 ? x + 1 : null).map(Object::toString).toList());
+    }
+    
+    @Test
+    public void testTakeUntilNull() {
+        List<String> list = StreamEx.of(1, 2, 3, null, 4, 5, 6, null)
+                .takeUntilNull()
+                .map(Object::toString)
+                .toList();
+        assertEquals(asList("1", "2", "3"), list);
     }
 }

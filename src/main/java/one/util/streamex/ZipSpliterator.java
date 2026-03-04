@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2023 StreamEx contributors
+ * Copyright 2015, 2024 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,9 +22,7 @@ import java.util.function.Consumer;
 
 import static one.util.streamex.Internals.Box;
 import static one.util.streamex.Internals.drainTo;
-import static one.util.streamex.UnknownSizeSpliterator.BATCH_UNIT;
-import static one.util.streamex.UnknownSizeSpliterator.MAX_BATCH;
-import static one.util.streamex.UnknownSizeSpliterator.USOfRef;
+import static one.util.streamex.UnknownSizeSpliterator.*;
 
 /**
  * @author Tagir Valeev

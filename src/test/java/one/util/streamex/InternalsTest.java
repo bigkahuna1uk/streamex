@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2023 StreamEx contributors
+ * Copyright 2015, 2024 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,22 +15,15 @@
  */
 package one.util.streamex;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Set;
-
 import one.util.streamex.Internals.PairBox;
 import org.junit.Test;
 
+import java.util.*;
+import java.util.function.Consumer;
+
 import static one.util.streamex.Internals.ArrayCollection;
 import static one.util.streamex.Internals.PartialCollector;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 /**
  * Tests for non-public APIs in StreamExInternals
@@ -72,5 +65,22 @@ public class InternalsTest {
         assertNotEquals(boxOneTwo, boxTwoOne);
         assertNotEquals(boxOneTwo, boxOneOne);
         assertEquals(boxTwoOne, boxOneOne);
+    }
+    
+    @Test
+    public void testCloneableSpliterator() {
+        class Splt extends Internals.CloneableSpliterator<Object, Splt> {
+            @Override
+            protected Object clone() throws CloneNotSupportedException {
+                throw new CloneNotSupportedException();
+            }
+
+            @Override public boolean tryAdvance(Consumer<? super Object> action) { return false; }
+            @Override public Spliterator<Object> trySplit() { return null; }
+            @Override public long estimateSize() { return 0; }
+            @Override public int characteristics() { return 0; }
+        }
+        Splt splt = new Splt();
+        assertThrows(InternalError.class, splt::doClone);
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2023 StreamEx contributors
+ * Copyright 2015, 2024 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,68 +15,27 @@
  */
 package one.util.streamex;
 
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.Buffer;
-import java.util.AbstractMap;
-import java.util.Arrays;
-import java.util.BitSet;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.IntSummaryStatistics;
-import java.util.List;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Objects;
-import java.util.OptionalDouble;
-import java.util.OptionalInt;
-import java.util.OptionalLong;
-import java.util.PrimitiveIterator;
 import java.util.PrimitiveIterator.OfInt;
-import java.util.Random;
-import java.util.Spliterator;
-import java.util.Spliterators;
 import java.util.Spliterators.AbstractIntSpliterator;
 import java.util.concurrent.ForkJoinPool;
-import java.util.function.BiConsumer;
-import java.util.function.DoublePredicate;
-import java.util.function.Function;
-import java.util.function.IntBinaryOperator;
-import java.util.function.IntConsumer;
-import java.util.function.IntFunction;
-import java.util.function.IntPredicate;
-import java.util.function.IntSupplier;
-import java.util.function.IntToDoubleFunction;
-import java.util.function.IntToLongFunction;
-import java.util.function.IntUnaryOperator;
-import java.util.function.LongPredicate;
-import java.util.function.ObjIntConsumer;
-import java.util.function.Predicate;
-import java.util.function.Supplier;
-import java.util.stream.Collector;
-import java.util.stream.DoubleStream;
-import java.util.stream.IntStream;
-import java.util.stream.LongStream;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
+import java.util.function.*;
+import java.util.stream.*;
 
-import static one.util.streamex.Internals.Box;
-import static one.util.streamex.Internals.ByteBuffer;
-import static one.util.streamex.Internals.CharBuffer;
-import static one.util.streamex.Internals.INITIAL_SIZE;
-import static one.util.streamex.Internals.IntBuffer;
-import static one.util.streamex.Internals.ObjIntBox;
-import static one.util.streamex.Internals.PrimitiveBox;
-import static one.util.streamex.Internals.ShortBuffer;
-import static one.util.streamex.Internals.checkLength;
-import static one.util.streamex.Internals.intSize;
-import static one.util.streamex.Internals.rangeCheck;
+import static one.util.streamex.Internals.*;
 
 /**
- * An {@link IntStream} implementation with additional functionality
- * 
- * @author Tagir Valeev
+ * An {@link IntStream} implementation with additional functionality.
  */
+@NullMarked
 public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Spliterator.OfInt, IntStreamEx> implements IntStream {
     IntStreamEx(IntStream stream, StreamContext context) {
         super(stream, context);
@@ -152,7 +111,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      * <p>
      * This is a short-circuiting terminal operation.
      * 
-     * @param value the value too look for in the stream
+     * @param value the value to look for in the stream
      * @return true if this stream contains the specified value
      * @see IntStream#anyMatch(IntPredicate)
      */
@@ -186,7 +145,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      * operation. May return itself if no values were supplied.
      * 
      * <p>
-     * Current implementation scans the supplied values linearly for every
+     * The current implementation scans the supplied values linearly for every
      * stream element.
      * 
      * <p>
@@ -280,7 +239,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
     }
 
     @Override
-    public <U> StreamEx<U> mapToObj(IntFunction<? extends U> mapper) {
+    public <U extends @Nullable Object> StreamEx<U> mapToObj(IntFunction<? extends U> mapper) {
         return new StreamEx<>(stream().mapToObj(mapper), context);
     }
 
@@ -311,14 +270,15 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      * @return the new stream
      * @since 0.3.1
      */
-    public <K, V> EntryStream<K, V> mapToEntry(IntFunction<? extends K> keyMapper,
+    public <K extends @Nullable Object, 
+            V extends @Nullable Object> EntryStream<K, V> mapToEntry(IntFunction<? extends K> keyMapper,
             IntFunction<? extends V> valueMapper) {
         return new EntryStream<>(stream().mapToObj(t -> new AbstractMap.SimpleImmutableEntry<>(keyMapper.apply(t),
                 valueMapper.apply(t))), context);
     }
 
     @Override
-    public IntStreamEx flatMap(IntFunction<? extends IntStream> mapper) {
+    public IntStreamEx flatMap(IntFunction<? extends @Nullable IntStream> mapper) {
         return new IntStreamEx(stream().flatMap(mapper), context);
     }
 
@@ -337,7 +297,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      * @return the new stream
      * @since 0.3.0
      */
-    public LongStreamEx flatMapToLong(IntFunction<? extends LongStream> mapper) {
+    public LongStreamEx flatMapToLong(IntFunction<? extends @Nullable LongStream> mapper) {
         return new LongStreamEx(stream().mapToObj(mapper).flatMapToLong(Function.identity()), context);
     }
 
@@ -356,7 +316,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      * @return the new stream
      * @since 0.3.0
      */
-    public DoubleStreamEx flatMapToDouble(IntFunction<? extends DoubleStream> mapper) {
+    public DoubleStreamEx flatMapToDouble(IntFunction<? extends @Nullable DoubleStream> mapper) {
         return new DoubleStreamEx(stream().mapToObj(mapper).flatMapToDouble(Function.identity()), context);
     }
 
@@ -376,13 +336,13 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      * @return the new stream
      * @since 0.3.0
      */
-    public <R> StreamEx<R> flatMapToObj(IntFunction<? extends Stream<R>> mapper) {
+    public <R extends @Nullable Object> StreamEx<R> flatMapToObj(IntFunction<? extends @Nullable Stream<R>> mapper) {
         return new StreamEx<>(stream().mapToObj(mapper).flatMap(Function.identity()), context);
     }
 
     /**
      * Returns a new stream containing all the elements of the original stream interspersed with
-     * given delimiter.
+     * a given delimiter.
      * 
      * <p>
      * For example, {@code IntStreamEx.of(1, 2, 3).intersperse(4)} will yield a stream containing
@@ -449,7 +409,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
 
     /**
      * Returns a stream consisting of the elements of this stream, sorted
-     * according to the natural order of the keys extracted by provided
+     * according to the natural order of the keys extracted by the provided
      * function.
      *
      * <p>
@@ -473,7 +433,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
 
     /**
      * Returns a stream consisting of the elements of this stream, sorted
-     * according to the int values extracted by provided function.
+     * according to the int values extracted by the provided function.
      *
      * <p>
      * For ordered streams, the sort is stable. For unordered streams, no
@@ -495,7 +455,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
 
     /**
      * Returns a stream consisting of the elements of this stream, sorted
-     * according to the long values extracted by provided function.
+     * according to the long values extracted by the provided function.
      *
      * <p>
      * For ordered streams, the sort is stable. For unordered streams, no
@@ -517,7 +477,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
 
     /**
      * Returns a stream consisting of the elements of this stream, sorted
-     * according to the double values extracted by provided function.
+     * according to the double values extracted by the provided function.
      *
      * <p>
      * For ordered streams, the sort is stable. For unordered streams, no
@@ -554,13 +514,13 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      * <p>
      * The action is called at most once. For parallel stream pipelines, it's
      * not guaranteed in which thread it will be executed, so if it modifies
-     * shared state, it is responsible for providing the required
+     * the shared state, it is responsible for providing the required
      * synchronization.
      *
      * <p>
      * Note that the action might not be called at all if the first element is
-     * not consumed from the input (for example, if there's short-circuiting
-     * operation downstream which stopped the stream before the first element).
+     * not consumed from the input (for example, if there's a short-circuiting
+     * operation downstream that stopped the stream before the first element).
      * 
      * <p>
      * This method exists mainly to support debugging.
@@ -591,12 +551,12 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      * <p>
      * The action is called at most once. For parallel stream pipelines, it's
      * not guaranteed in which thread it will be executed, so if it modifies
-     * shared state, it is responsible for providing the required
+     * the shared state, it is responsible for providing the required
      * synchronization.
      * 
      * <p>
      * Note that the action might not be called at all if the last element is
-     * not consumed from the input (for example, if there's short-circuiting
+     * not consumed from the input (for example, if there's a short-circuiting
      * operation downstream).
      * 
      * <p>
@@ -731,7 +691,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      * <p>
      * Note that only the least-significant byte of every number encountered in
      * this stream is preserved in the resulting {@code InputStream}, other
-     * bytes are silently lost. Thus it's a caller responsibility to check
+     * bytes are silently lost. Thus, it's a caller's responsibility to check
      * whether this may cause problems.
      * 
      * <p>
@@ -910,7 +870,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
 
     /**
      * Produces an array containing cumulative results of applying the
-     * accumulation function going left to right using given seed value.
+     * accumulation function going left to right using a given seed value.
      * 
      * <p>
      * This is a terminal operation.
@@ -928,7 +888,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      *        <a href="package-summary.html#NonInterference">non-interfering
      *        </a>, <a href="package-summary.html#Statelessness">stateless</a>
      *        function for incorporating an additional element into a result
-     * @return the array where the first element is the seed and every successor
+     * @return the array where the first element is the seed, and every successor
      *         element is the result of applying accumulator function to the
      *         previous array element and the corresponding stream element. The
      *         resulting array is one element longer than this stream.
@@ -945,7 +905,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      * @see #collect(IntCollector)
      */
     @Override
-    public <R> R collect(Supplier<R> supplier, ObjIntConsumer<R> accumulator, BiConsumer<R, R> combiner) {
+    public <R extends @Nullable Object> R collect(Supplier<R> supplier, ObjIntConsumer<R> accumulator, BiConsumer<R, R> combiner) {
         if (context.fjp != null)
             return context.terminate(() -> stream().collect(supplier, accumulator, combiner));
         return stream().collect(supplier, accumulator, combiner);
@@ -953,8 +913,8 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
 
     /**
      * Performs a mutable reduction operation on the elements of this stream
-     * using an {@link IntCollector} which encapsulates the supplier,
-     * accumulator and merger functions making easier to reuse collection
+     * using an {@link IntCollector} which encapsulates a supplier,
+     * an accumulator, and a merger function making easier to reuse collection
      * strategies.
      *
      * <p>
@@ -972,7 +932,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      * @since 0.3.0
      */
     @SuppressWarnings("unchecked")
-    public <A, R> R collect(IntCollector<A, R> collector) {
+    public <A extends @Nullable Object, R extends @Nullable Object> R collect(IntCollector<A, R> collector) {
         if (collector.characteristics().contains(Collector.Characteristics.IDENTITY_FINISH))
             return (R) collect(collector.supplier(), collector.intAccumulator(), collector.merger());
         return collector.finisher().apply(collect(collector.supplier(), collector.intAccumulator(), collector
@@ -1500,7 +1460,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
 
     /**
      * Returns an object-valued {@link StreamEx} consisting of the elements of
-     * given array corresponding to the indices which appear in this stream.
+     * a given array corresponding to the indices which appear in this stream.
      *
      * <p>
      * This is an intermediate operation.
@@ -1510,7 +1470,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      * @return the new stream
      * @since 0.1.2
      */
-    public <U> StreamEx<U> elements(U[] array) {
+    public <U extends @Nullable Object> StreamEx<U> elements(U[] array) {
         return mapToObj(idx -> array[idx]);
     }
 
@@ -1532,12 +1492,12 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      * @return the new stream
      * @since 0.1.2
      */
-    public <U> StreamEx<U> elements(List<U> list) {
+    public <U extends @Nullable Object> StreamEx<U> elements(List<U> list) {
         return mapToObj(list::get);
     }
 
     /**
-     * Returns an {@link IntStreamEx} consisting of the elements of given array
+     * Returns an {@link IntStreamEx} consisting of the elements of a given array
      * corresponding to the indices which appear in this stream.
      *
      * <p>
@@ -1552,7 +1512,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
     }
 
     /**
-     * Returns a {@link LongStreamEx} consisting of the elements of given array
+     * Returns a {@link LongStreamEx} consisting of the elements of a given array
      * corresponding to the indices which appear in this stream.
      *
      * <p>
@@ -1567,7 +1527,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
     }
 
     /**
-     * Returns a {@link DoubleStreamEx} consisting of the elements of given
+     * Returns a {@link DoubleStreamEx} consisting of the elements of a given
      * array corresponding to the indices which appear in this stream.
      *
      * <p>
@@ -1621,10 +1581,10 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      * 
      * <p>
      * The output stream will contain one element less than this stream. If this
-     * stream contains zero or one element the output stream will be empty.
+     * stream contains zero or one element, the output stream will be empty.
      *
      * @param mapper a non-interfering, stateless function to apply to each
-     *        adjacent pair of this stream elements.
+     *        adjacent pair of this stream's elements.
      * @return the new stream
      * @since 0.2.1
      */
@@ -1641,7 +1601,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      * This is a terminal operation.
      * 
      * @param delimiter the delimiter to be used between each element
-     * @return the result of concatenation. For empty input stream empty String
+     * @return the result of concatenation. For an empty input stream, an empty String
      *         is returned.
      * @since 0.3.1
      */
@@ -1678,8 +1638,8 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      * <p>
      * This is a short-circuiting stateful operation. It can be either
      * <a href="package-summary.html#StreamOps">intermediate or
-     * quasi-intermediate</a>. When using with JDK 1.9 or higher it calls the
-     * corresponding JDK 1.9 implementation. When using with JDK 1.8 it uses own
+     * quasi-intermediate</a>. When using with JDK 1.9 or higher, it calls the
+     * corresponding JDK 1.9 implementation. When using with JDK 1.8, it uses its own
      * implementation.
      * 
      * <p>
@@ -1729,8 +1689,8 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      * <p>
      * This is a stateful operation. It can be either
      * <a href="package-summary.html#StreamOps">intermediate or
-     * quasi-intermediate</a>. When using with JDK 1.9 or higher it calls the
-     * corresponding JDK 1.9 implementation. When using with JDK 1.8 it uses own
+     * quasi-intermediate</a>. When using with JDK 1.9 or higher, it calls the
+     * corresponding JDK 1.9 implementation. When using with JDK 1.8, it uses its own
      * implementation.
      * 
      * <p>
@@ -1747,7 +1707,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
     }
 
     /**
-     * Returns a stream where the first element is the replaced with the result
+     * Returns a stream where the first element is replaced with the result
      * of applying the given function while the other elements are left intact.
      *
      * <p>
@@ -1767,7 +1727,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
     }
 
     /**
-     * Returns a stream where the last element is the replaced with the result
+     * Returns a stream where the last element is replaced with the result
      * of applying the given function while the other elements are left intact.
      *
      * <p>
@@ -1776,7 +1736,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      *
      * <p>
      * The mapper function is called at most once. It could be not called at all
-     * if the stream is empty or there is short-circuiting operation downstream.
+     * if the stream is empty or there is a short-circuiting operation downstream.
      *
      * @param mapper a
      *        <a href="package-summary.html#NonInterference">non-interfering
@@ -1823,10 +1783,10 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
                 : new PrefixOps.OfUnordInt(spltr, op));
     }
 
-    // Necessary to generate proper JavaDoc
-    // does not add overhead as it appears in bytecode anyways as bridge method
+    // Necessary to generate proper Javadoc
+    // does not add overhead as it appears in bytecode anyway as a bridge method
     @Override
-    public <U> U chain(Function<? super IntStreamEx, U> mapper) {
+    public <U extends @Nullable Object> U chain(Function<? super IntStreamEx, U> mapper) {
         return mapper.apply(this);
     }
 
@@ -1881,7 +1841,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
 
     /**
      * Returns a sequential ordered {@code IntStreamEx} whose elements are the
-     * specified values casted to int.
+     * specified values cast to int.
      *
      * @param elements the elements of the new stream
      * @return the new stream
@@ -1893,7 +1853,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
 
     /**
      * Returns a sequential {@link IntStreamEx} with the specified range of the
-     * specified array as its source. Array values will be casted to int.
+     * specified array as its source. Array values will be cast to int.
      *
      * @param array the array, assumed to be unmodified during use
      * @param startInclusive the first index to cover, inclusive
@@ -1912,7 +1872,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
 
     /**
      * Returns a sequential ordered {@code IntStreamEx} whose elements are the
-     * specified values casted to int.
+     * specified values cast to int.
      *
      * @param elements the elements of the new stream
      * @return the new stream
@@ -1924,7 +1884,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
 
     /**
      * Returns a sequential {@link IntStreamEx} with the specified range of the
-     * specified array as its source. Array values will be casted to int.
+     * specified array as its source. Array values will be cast to int.
      *
      * @param array the array, assumed to be unmodified during use
      * @param startInclusive the first index to cover, inclusive
@@ -1943,7 +1903,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
 
     /**
      * Returns a sequential ordered {@code IntStreamEx} whose elements are the
-     * specified values casted to int.
+     * specified values cast to int.
      *
      * @param elements the elements of the new stream
      * @return the new stream
@@ -1955,7 +1915,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
 
     /**
      * Returns a sequential {@link IntStreamEx} with the specified range of the
-     * specified array as its source. Array values will be casted to int.
+     * specified array as its source. Array values will be cast to int.
      *
      * @param array the array, assumed to be unmodified during use
      * @param startInclusive the first index to cover, inclusive
@@ -2026,7 +1986,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
 
     /**
      * Returns a sequential ordered {@code IntStreamEx} whose elements are the
-     * unboxed elements of supplied array.
+     * unboxed elements of a supplied array.
      *
      * @param array the array to create the stream from.
      * @return the new stream
@@ -2063,13 +2023,12 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      * Returns a sequential ordered {@code IntStreamEx} containing all the
      * indices of the supplied list.
      *
-     * @param <T> list element type
      * @param list list to get the stream of its indices
      * @return a sequential {@code IntStreamEx} for the range of {@code int}
      *         elements starting from 0 to (not inclusive) list.size()
      * @since 0.1.1
      */
-    public static <T> IntStreamEx ofIndices(List<T> list) {
+    public static IntStreamEx ofIndices(List<?> list) {
         return range(list.size());
     }
 
@@ -2088,7 +2047,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      * @return a sequential {@code IntStreamEx} of the matched list indices
      * @since 0.1.1
      */
-    public static <T> IntStreamEx ofIndices(List<T> list, Predicate<T> predicate) {
+    public static <T extends @Nullable Object> IntStreamEx ofIndices(List<T> list, Predicate<? super T> predicate) {
         return seq(IntStream.range(0, list.size()).filter(i -> predicate.test(list.get(i))));
     }
 
@@ -2096,13 +2055,12 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      * Returns a sequential ordered {@code IntStreamEx} containing all the
      * indices of the supplied array.
      *
-     * @param <T> array element type
      * @param array array to get the stream of its indices
      * @return a sequential {@code IntStreamEx} for the range of {@code int}
      *         elements starting from 0 to (not inclusive) array.length
      * @since 0.1.1
      */
-    public static <T> IntStreamEx ofIndices(T[] array) {
+    public static IntStreamEx ofIndices(@Nullable Object[] array) {
         return range(array.length);
     }
 
@@ -2116,13 +2074,13 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      * @return a sequential {@code IntStreamEx} of the matched array indices
      * @since 0.1.1
      */
-    public static <T> IntStreamEx ofIndices(T[] array, Predicate<T> predicate) {
+    public static <T extends @Nullable Object> IntStreamEx ofIndices(T[] array, Predicate<? super T> predicate) {
         return seq(IntStream.range(0, array.length).filter(i -> predicate.test(array[i])));
     }
 
     /**
      * Returns a sequential ordered {@code IntStreamEx} containing all the
-     * indices of supplied array.
+     * indices of a supplied array.
      *
      * @param array array to get the stream of its indices
      * @return a sequential {@code IntStreamEx} for the range of {@code int}
@@ -2148,7 +2106,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
 
     /**
      * Returns a sequential ordered {@code IntStreamEx} containing all the
-     * indices of supplied array.
+     * indices of a supplied array.
      *
      * @param array array to get the stream of its indices
      * @return a sequential {@code IntStreamEx} for the range of {@code int}
@@ -2174,7 +2132,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
 
     /**
      * Returns a sequential ordered {@code IntStreamEx} containing all the
-     * indices of supplied array.
+     * indices of a supplied array.
      *
      * @param array array to get the stream of its indices
      * @return a sequential {@code IntStreamEx} for the range of {@code int}
@@ -2233,11 +2191,11 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      *
      * <p>
      * This method is roughly equivalent to
-     * {@code IntStreamEx.of(Spliterators.spliteratorUnknownSize(iterator, ORDERED))}
-     * , but may show better performance for parallel processing.
+     * {@code IntStreamEx.of(Spliterators.spliteratorUnknownSize(iterator, ORDERED))},
+     * but may show better performance for parallel processing.
      * 
      * <p>
-     * Use this method only if you cannot provide better Stream source.
+     * Use this method only if you cannot provide a better Stream source.
      *
      * @param iterator an iterator to create the stream from.
      * @return the new stream
@@ -2283,7 +2241,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
 
     /**
      * Returns a sequential ordered {@code IntStreamEx} whose elements are the
-     * unboxed elements of supplied collection.
+     * unboxed elements of a supplied collection.
      *
      * @param collection the collection to create the stream from.
      * @return the new stream
@@ -2360,7 +2318,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
     /**
      * Returns an {@code IntStreamEx} of {@code int} zero-extending the
      * {@code char} values from the supplied {@link CharSequence}. Any char
-     * which maps to a surrogate code point is passed through uninterpreted.
+     * that maps to a surrogate code point is passed through uninterpreted.
      *
      * <p>
      * If the sequence is mutated while the stream is being read, the result is
@@ -2408,7 +2366,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      * element at position {@code n - 1}.
      *
      * @param seed the initial element
-     * @param f a function to be applied to to the previous element to produce a
+     * @param f a function to be applied to the previous element to produce a
      *        new element
      * @return A new sequential {@code IntStream}
      * @see #iterate(int, IntPredicate, IntUnaryOperator)
@@ -2435,7 +2393,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      *
      * <p>
      * The resulting sequence may be empty if the predicate does not hold on the
-     * seed value. Otherwise the first element will be the supplied seed value,
+     * seed value. Otherwise, the first element will be the supplied seed value,
      * the next element (if present) will be the result of applying the function
      * f to the seed value, and so on iteratively until the predicate indicates
      * that the stream should terminate.
@@ -2513,17 +2471,17 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      * <p>
      * The producer function may call the passed consumer any number of times
      * and return true if the producer should be called again or false
-     * otherwise. It's guaranteed that the producer will not be called anymore,
+     * otherwise. It's guaranteed that the producer will not be called anymore 
      * once it returns false.
      * 
      * <p>
-     * This method is particularly useful when producer changes the mutable
-     * object which should be left in known state after the full stream
-     * consumption. Note however that if a short-circuiting operation is used,
+     * This method is particularly useful when the producer changes the mutable
+     * object which should be left in a known state after the full stream
+     * consumption. Note, however, that if a short-circuiting operation is used,
      * then the final state of the mutable object cannot be guaranteed.
      * 
      * @param producer a predicate which calls the passed consumer to emit
-     *        stream element(s) and returns true if it producer should be
+     *        stream element(s) and returns true if the producer should be
      *        applied again.
      * @return the new stream
      * @since 0.6.0
@@ -2589,7 +2547,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      *        the consecutive values of the resulting stream.
      * @return a sequential {@code IntStreamEx} for the range of {@code int}
      *         elements
-     * @throws IllegalArgumentException if step is zero
+     * @throws IllegalArgumentException if the step is zero
      * @see IntStreamEx#range(int, int)
      * @since 0.4.0
      */
@@ -2626,7 +2584,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      * Note that depending on the step value the {@code endInclusive} bound may
      * still not be reached. For example
      * {@code IntStreamEx.rangeClosed(0, 5, 2)} will yield the stream of three
-     * numbers: 0, 2 and 4.
+     * numbers: 0, 2, and 4.
      *
      * @param startInclusive the (inclusive) initial value
      * @param endInclusive the inclusive upper (for positive step) or lower (for negative step) bound
@@ -2634,9 +2592,9 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      *        the consecutive values of the resulting stream.
      * @return a sequential {@code IntStreamEx} for the range of {@code int}
      *         elements; an empty stream if startInclusive is greater than endInclusive
-     *         for positive step, or if startInclusive is less than endInclusive
-     *         for negative step.
-     * @throws IllegalArgumentException if step is zero
+     *         for a positive step, or if startInclusive is less than endInclusive
+     *         for a negative step.
+     * @throws IllegalArgumentException if the step is zero
      * @see IntStreamEx#rangeClosed(int, int)
      * @since 0.4.0
      */
@@ -2683,7 +2641,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      * @param mapper a non-interfering, stateless function to apply to each pair
      *        of the corresponding array elements.
      * @return a new {@code IntStreamEx}
-     * @throws IllegalArgumentException if length of the arrays differs.
+     * @throws IllegalArgumentException if the length of the arrays differs.
      * @since 0.2.1
      */
     public static IntStreamEx zip(int[] first, int[] second, IntBinaryOperator mapper) {
@@ -2699,7 +2657,7 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      * be easily expressed using
      * {@link IntStreamEx#iterate(int, IntUnaryOperator)} or
      * {@link IntStreamEx#generate(IntSupplier)}. For example, the following
-     * method generates a Collatz sequence starting from given number:
+     * method generates a Collatz sequence starting from a given number:
      * 
      * <pre>{@code
      * public static IntEmitter collatz(int start) {
@@ -2713,8 +2671,6 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
      * Now you can use {@code collatz(17).stream()} to get the stream of Collatz
      * numbers.
      * 
-     * @author Tagir Valeev
-     *
      * @since 0.6.0
      */
     @FunctionalInterface
@@ -2727,18 +2683,18 @@ public final class IntStreamEx extends BaseStreamEx<Integer, IntStream, Splitera
          * <p>
          * Normally one element is emitted during the {@code next()} method
          * call. However, it's not restricted: you may emit as many elements as
-         * you want, though in some cases if many elements were emitted they
+         * you want, though in some cases if many elements were emitted, they
          * might be buffered consuming additional memory.
          * 
          * <p>
-         * It's allowed not to emit anything (don't call the consumer). However
-         * if you do this and return new emitter which also does not emit
+         * It's allowed not to emit anything (don't call the consumer). However,
+         * if you do this and return a new emitter that also does not emit
          * anything, you will end up in endless loop.
          * 
          * @param action consumer to be called to emit elements
          * @return next emitter or null
          */
-        IntEmitter next(IntConsumer action);
+        @Nullable IntEmitter next(IntConsumer action);
 
         /**
          * Returns the spliterator which covers all the elements emitted by this

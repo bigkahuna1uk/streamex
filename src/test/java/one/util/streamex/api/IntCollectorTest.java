@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2023 StreamEx contributors
+ * Copyright 2015, 2024 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,13 @@
  */
 package one.util.streamex.api;
 
+import one.util.streamex.DoubleCollector;
+import one.util.streamex.IntCollector;
+import one.util.streamex.IntStreamEx;
+import org.junit.FixMethodOrder;
+import org.junit.Test;
+import org.junit.runners.MethodSorters;
+
 import java.util.BitSet;
 import java.util.IntSummaryStatistics;
 import java.util.List;
@@ -22,20 +29,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import org.junit.FixMethodOrder;
-import org.junit.Test;
-import org.junit.runners.MethodSorters;
-
-import one.util.streamex.DoubleCollector;
-import one.util.streamex.IntCollector;
-import one.util.streamex.IntStreamEx;
-
 import static one.util.streamex.TestHelpers.withRandom;
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 /**
  * @author Tagir Valeev

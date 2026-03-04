@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2023 StreamEx contributors
+ * Copyright 2015, 2024 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,38 +15,16 @@
  */
 package one.util.streamex;
 
-import java.util.BitSet;
-import java.util.HashMap;
-import java.util.IntSummaryStatistics;
-import java.util.Map;
-import java.util.Objects;
-import java.util.OptionalDouble;
-import java.util.OptionalInt;
-import java.util.function.BiConsumer;
-import java.util.function.Function;
-import java.util.function.IntBinaryOperator;
-import java.util.function.IntFunction;
-import java.util.function.IntPredicate;
-import java.util.function.IntUnaryOperator;
-import java.util.function.ObjIntConsumer;
-import java.util.function.Supplier;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+
+import java.util.*;
+import java.util.function.*;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import static one.util.streamex.Internals.AverageLong;
-import static one.util.streamex.Internals.BooleanMap;
-import static one.util.streamex.Internals.Box;
-import static one.util.streamex.Internals.ByteBuffer;
-import static one.util.streamex.Internals.CharBuffer;
-import static one.util.streamex.Internals.ID_CHARACTERISTICS;
-import static one.util.streamex.Internals.IntBuffer;
-import static one.util.streamex.Internals.IntCollectorImpl;
-import static one.util.streamex.Internals.NO_CHARACTERISTICS;
-import static one.util.streamex.Internals.PartialCollector;
-import static one.util.streamex.Internals.PrimitiveBox;
-import static one.util.streamex.Internals.ShortBuffer;
-import static one.util.streamex.Internals.UNBOX_INT;
+import static one.util.streamex.Internals.*;
 
 /**
  * A {@link Collector} specialized to work with primitive {@code int}.
@@ -59,7 +37,8 @@ import static one.util.streamex.Internals.UNBOX_INT;
  * @see IntStreamEx#collect(IntCollector)
  * @since 0.3.0
  */
-public interface IntCollector<A, R> extends MergingCollector<Integer, A, R> {
+@NullMarked
+public interface IntCollector<A extends @Nullable Object, R extends @Nullable Object> extends MergingCollector<Integer, A, R> {
     /**
      * A function that folds a value into a mutable result container.
      *
@@ -91,7 +70,7 @@ public interface IntCollector<A, R> extends MergingCollector<Integer, A, R> {
      *         by an additional finishing step
      * @since 0.3.7
      */
-    default <RR> IntCollector<A, RR> andThen(Function<R, RR> finisher) {
+    default <RR extends @Nullable Object> IntCollector<A, RR> andThen(Function<R, RR> finisher) {
         return of(supplier(), intAccumulator(), merger(), finisher().andThen(finisher));
     }
 
@@ -108,7 +87,10 @@ public interface IntCollector<A, R> extends MergingCollector<Integer, A, R> {
      *        result, for the new collector
      * @return the new {@code IntCollector}
      */
-    static <R> IntCollector<R, R> of(Supplier<R> supplier, ObjIntConsumer<R> intAccumulator, BiConsumer<R, R> merger) {
+    static <R extends @Nullable Object> IntCollector<R, R> of(
+            Supplier<R> supplier,
+            ObjIntConsumer<R> intAccumulator,
+            BiConsumer<R, R> merger) {
         return new IntCollectorImpl<>(supplier, intAccumulator, merger, Function.identity(), ID_CHARACTERISTICS);
     }
 
@@ -122,7 +104,8 @@ public interface IntCollector<A, R> extends MergingCollector<Integer, A, R> {
      * @return an {@code IntCollector} which behaves in the same way as input
      *         collector.
      */
-    static <A, R> IntCollector<?, R> of(Collector<Integer, A, R> collector) {
+    static <A extends @Nullable Object, R extends @Nullable Object> IntCollector<?, R> of(
+            Collector<Integer, A, R> collector) {
         if (collector instanceof IntCollector) {
             return (IntCollector<A, R>) collector;
         }
@@ -142,7 +125,8 @@ public interface IntCollector<A, R> extends MergingCollector<Integer, A, R> {
      * @param <R> The final result type of the new collector
      * @return the new {@code IntCollector}
      */
-    static <A, R> IntCollector<A, R> of(Supplier<A> supplier, ObjIntConsumer<A> intAccumulator,
+    static <A extends @Nullable Object, R extends @Nullable Object> IntCollector<A, R> of(
+            Supplier<A> supplier, ObjIntConsumer<A> intAccumulator,
             BiConsumer<A, A> merger, Function<A, R> finisher) {
         return new IntCollectorImpl<>(supplier, intAccumulator, merger, finisher, NO_CHARACTERISTICS);
     }
@@ -264,7 +248,8 @@ public interface IntCollector<A, R> extends MergingCollector<Integer, A, R> {
      *         elements and provides the mapped results to the downstream
      *         collector
      */
-    static <A, R> IntCollector<?, R> mapping(IntUnaryOperator mapper, IntCollector<A, R> downstream) {
+    static <A extends @Nullable Object, R extends @Nullable Object> IntCollector<?, R> mapping(
+            IntUnaryOperator mapper, IntCollector<A, R> downstream) {
         ObjIntConsumer<A> downstreamAccumulator = downstream.intAccumulator();
         return new IntCollectorImpl<>(downstream.supplier(), (r, t) -> downstreamAccumulator.accept(r, mapper
                 .applyAsInt(t)), downstream.merger(), downstream.finisher(), downstream.characteristics());
@@ -284,7 +269,8 @@ public interface IntCollector<A, R> extends MergingCollector<Integer, A, R> {
      *         elements and provides the mapped results to the downstream
      *         collector
      */
-    static <U, A, R> IntCollector<?, R> mappingToObj(IntFunction<U> mapper, Collector<U, A, R> downstream) {
+    static <U extends @Nullable Object, A extends @Nullable Object, R extends @Nullable Object> IntCollector<?, R> mappingToObj(
+            IntFunction<U> mapper, Collector<U, A, R> downstream) {
         BiConsumer<A, U> accumulator = downstream.accumulator();
         if (downstream instanceof MergingCollector) {
             return new IntCollectorImpl<>(downstream.supplier(), (acc, i) -> accumulator.accept(acc, mapper.apply(i)),
@@ -382,7 +368,9 @@ public interface IntCollector<A, R> extends MergingCollector<Integer, A, R> {
      * @return an {@code IntCollector} implementing the cascaded partitioning
      *         operation
      */
-    static <A, D> IntCollector<?, Map<Boolean, D>> partitioningBy(IntPredicate predicate, IntCollector<A, D> downstream) {
+    static <A extends @Nullable Object, D extends @Nullable Object> IntCollector<?, Map<Boolean, D>> partitioningBy(
+            IntPredicate predicate, 
+            IntCollector<A, D> downstream) {
         ObjIntConsumer<A> downstreamAccumulator = downstream.intAccumulator();
         ObjIntConsumer<BooleanMap<A>> accumulator = (result, t) -> downstreamAccumulator.accept(
             predicate.test(t) ? result.trueValue : result.falseValue, t);
@@ -438,7 +426,8 @@ public interface IntCollector<A, R> extends MergingCollector<Integer, A, R> {
      * @return an {@code IntCollector} implementing the cascaded group-by
      *         operation
      */
-    static <K, D, A> IntCollector<?, Map<K, D>> groupingBy(IntFunction<? extends K> classifier,
+    static <K, D extends @Nullable Object, A extends @Nullable Object> IntCollector<?, Map<K, D>> groupingBy(
+            IntFunction<? extends K> classifier,
             IntCollector<A, D> downstream) {
         return groupingBy(classifier, HashMap::new, downstream);
     }
@@ -468,7 +457,8 @@ public interface IntCollector<A, R> extends MergingCollector<Integer, A, R> {
      * @return an {@code IntCollector} implementing the cascaded group-by
      *         operation
      */
-    static <K, D, A, M extends Map<K, D>> IntCollector<?, M> groupingBy(IntFunction<? extends K> classifier,
+    static <K, D extends @Nullable Object, A extends @Nullable Object, M extends Map<K, D>> IntCollector<?, M> groupingBy(
+            IntFunction<? extends K> classifier,
             Supplier<M> mapFactory, IntCollector<A, D> downstream) {
         Supplier<A> downstreamSupplier = downstream.supplier();
         Function<K, A> supplier = k -> downstreamSupplier.get();

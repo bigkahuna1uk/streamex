@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2023 StreamEx contributors
+ * Copyright 2015, 2024 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,16 +15,15 @@
  */
 package one.util.streamex;
 
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+
 import java.text.BreakIterator;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import java.util.function.BiConsumer;
-import java.util.function.BinaryOperator;
-import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.function.Supplier;
+import java.util.function.*;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
@@ -35,7 +34,7 @@ import static one.util.streamex.Internals.checkNonNegative;
  * An advanced implementation of joining {@link Collector}. This collector is
  * capable to join the input {@code CharSequence} elements with given delimiter
  * optionally wrapping into given prefix and suffix and optionally limiting the
- * length of the resulting string (in Unicode code units, code points or
+ * length of the resulting string (in Unicode code units, code points, or
  * grapheme clusters) adding the specified ellipsis sequence. This collector
  * supersedes the standard JDK
  * {@link Collectors#joining(CharSequence, CharSequence, CharSequence)}
@@ -44,12 +43,12 @@ import static one.util.streamex.Internals.checkNonNegative;
  * <p>
  * This collector is <a
  * href="package-summary.html#ShortCircuitReduction">short-circuiting</a> when
- * the string length is limited in either of ways. Otherwise it's not
+ * the string length is limited in either of ways. Otherwise, it's not
  * short-circuiting.
  * 
  * <p>
  * Every specific collector represented by this class is immutable, so you can
- * share it. A bunch of methods is provided to create a new collector based on
+ * share it. A bunch of methods are provided to create a new collector based on
  * this one.
  * 
  * <p>
@@ -74,6 +73,7 @@ import static one.util.streamex.Internals.checkNonNegative;
  * @author Tagir Valeev
  * @since 0.4.1
  */
+@NullMarked
 public class Joining extends CancellableCollector<CharSequence, Joining.Accumulator, String> {
     static final class Accumulator {
         final List<CharSequence> data = new ArrayList<>();
@@ -130,9 +130,8 @@ public class Joining extends CancellableCollector<CharSequence, Joining.Accumula
                     count++;
                 return count;
             case LENGTH_ELEMENTS:
-                return content ? 1 : 0;
             default:
-                throw new InternalError();
+                return content ? 1 : 0;
         }
     }
 
@@ -169,9 +168,8 @@ public class Joining extends CancellableCollector<CharSequence, Joining.Accumula
                 }
                 break;
             case LENGTH_ELEMENTS:
-                break;
             default:
-                throw new InternalError();
+                break;
         }
         if (endPos < str.length()) {
             BreakIterator bi;
@@ -193,11 +191,10 @@ public class Joining extends CancellableCollector<CharSequence, Joining.Accumula
             case CUT_ANYWHERE:
                 break;
             case CUT_CODEPOINT:
+            default:
                 if (Character.isHighSurrogate(str.charAt(endPos - 1)) && Character.isLowSurrogate(str.charAt(endPos)))
                     endPos--;
                 break;
-            default:
-                throw new InternalError();
             }
         }
         str.getChars(0, endPos, buf, pos);
@@ -257,7 +254,7 @@ public class Joining extends CancellableCollector<CharSequence, Joining.Accumula
      * maximal allowed length of the resulting {@code String}.
      * 
      * <p>
-     * If length limit is specified for the collector, the prefix length and the
+     * If a length limit is specified for the collector, the prefix length and the
      * suffix length are also counted towards this limit. If the length of the
      * prefix and the suffix exceed the limit, the resulting collector will not
      * accumulate any elements and produce the same output. For example,
@@ -288,7 +285,7 @@ public class Joining extends CancellableCollector<CharSequence, Joining.Accumula
      * {@code "..."} when the string limit (if specified) is reached.
      * 
      * @param ellipsis the sequence of characters to be used at the end of the
-     *        joined result to designate that not all of the input elements are
+     *        joined result to designate that not all the input elements are
      *        joined due to the specified string length restriction.
      * @return a new {@code Collector} which will use the specified ellipsis
      *         instead of current setting.
@@ -310,7 +307,7 @@ public class Joining extends CancellableCollector<CharSequence, Joining.Accumula
      * have {@link String#length() length} which does not exceed the specified
      * limit. An ellipsis sequence (by default {@code "..."}) is used to
      * designate whether the limit was reached. Use
-     * {@link #ellipsis(CharSequence)} to set custom ellipsis sequence.
+     * {@link #ellipsis(CharSequence)} to set a custom ellipsis sequence.
      * 
      * <p>
      * The collector returned by this method is <a
@@ -337,7 +334,7 @@ public class Joining extends CancellableCollector<CharSequence, Joining.Accumula
      * The {@code String} produced by the resulting collector is guaranteed to
      * have no more code points than the specified limit. An ellipsis sequence
      * (by default {@code "..."}) is used to designate whether the limit was
-     * reached. Use {@link #ellipsis(CharSequence)} to set custom ellipsis
+     * reached. Use {@link #ellipsis(CharSequence)} to set a custom ellipsis
      * sequence.
      * 
      * <p>
@@ -360,14 +357,14 @@ public class Joining extends CancellableCollector<CharSequence, Joining.Accumula
      * {@code maxGraphemes(int)} or {@link #maxElements(int)} call.
      * 
      * <p>
-     * The grapheme cluster is defined in <a
+     * The grapheme cluster is defined in the <a
      * href="http://www.unicode.org/reports/tr29/#Grapheme_Cluster_Boundaries"
      * >Unicode Text Segmentation</a> technical report. Basically, it counts
-     * base character and the following combining characters as single object.
+     * base character and the following combining characters as a single object.
      * The {@code String} produced by the resulting collector is guaranteed to
      * have no more grapheme clusters than the specified limit. An ellipsis
      * sequence (by default {@code "..."}) is used to designate whether the
-     * limit was reached. Use {@link #ellipsis(CharSequence)} to set custom
+     * limit was reached. Use {@link #ellipsis(CharSequence)} to set a custom
      * ellipsis sequence.
      * 
      * <p>
@@ -393,7 +390,7 @@ public class Joining extends CancellableCollector<CharSequence, Joining.Accumula
      * The {@code String} produced by the resulting collector is guaranteed to
      * have no more input elements than the specified limit. An ellipsis
      * sequence (by default {@code "..."}) is used to designate whether the
-     * limit was reached. Use {@link #ellipsis(CharSequence)} to set custom
+     * limit was reached. Use {@link #ellipsis(CharSequence)} to set a custom
      * ellipsis sequence. The cutting strategy is mostly irrelevant for this
      * mode except {@link #cutBeforeDelimiter()}.
      * <p>
@@ -418,7 +415,7 @@ public class Joining extends CancellableCollector<CharSequence, Joining.Accumula
      * The resulting collector will produce {@code String} which length is
      * exactly equal to the specified limit if the limit is reached. If used
      * with {@link #maxChars(int)}, the resulting string may be cut in the
-     * middle of surrogate pair.
+     * middle of the surrogate pair.
      * 
      * @return a new {@code Collector} which cuts the resulting string at any
      *         point when limit is reached.
@@ -433,7 +430,7 @@ public class Joining extends CancellableCollector<CharSequence, Joining.Accumula
      * 
      * <p>
      * The resulting collector will not split the surrogate pair when used with
-     * {@link #maxChars(int)} or {@link #maxCodePoints(int)}. However it may
+     * {@link #maxChars(int)} or {@link #maxCodePoints(int)}. However, it may
      * remove the combining character which may result in incorrect rendering of
      * the last displayed grapheme.
      * 
@@ -450,9 +447,9 @@ public class Joining extends CancellableCollector<CharSequence, Joining.Accumula
      * This is the default behavior.
      * 
      * <p>
-     * The grapheme cluster is defined in <a
+     * The grapheme cluster is defined in the <a
      * href="http://www.unicode.org/reports/tr29/#Grapheme_Cluster_Boundaries"
-     * >Unicode Text Segmentation</a> technical report. Thus the resulting
+     * >Unicode Text Segmentation</a> technical report. Thus, the resulting
      * collector will not split the surrogate pair and will preserve any
      * combining characters or remove them with the base character.
      * 
@@ -638,7 +635,7 @@ public class Joining extends CancellableCollector<CharSequence, Joining.Accumula
     }
 
     @Override
-    Predicate<Accumulator> finished() {
+    @Nullable Predicate<Accumulator> finished() {
         if (maxLength == -1)
             return null;
         init();

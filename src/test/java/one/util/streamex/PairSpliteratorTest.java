@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2023 StreamEx contributors
+ * Copyright 2015, 2024 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,12 +15,11 @@
  */
 package one.util.streamex;
 
-import java.util.Arrays;
-import java.util.Spliterator;
-
+import one.util.streamex.PairSpliterator.PSOfRef;
 import org.junit.Test;
 
-import one.util.streamex.PairSpliterator.PSOfRef;
+import java.util.Arrays;
+import java.util.Spliterator;
 
 import static one.util.streamex.TestHelpers.checkSpliterator;
 import static one.util.streamex.TestHelpers.withRandom;

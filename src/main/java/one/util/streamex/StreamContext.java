@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2023 StreamEx contributors
+ * Copyright 2015, 2024 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 package one.util.streamex;
+
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.ForkJoinPool;
 import java.util.function.Function;
@@ -36,23 +39,24 @@ import java.util.stream.BaseStream;
  * 
  * @author Tagir Valeev
  */
+@NullMarked
 /* package */class StreamContext {
     static final StreamContext SEQUENTIAL = new StreamContext(false);
     static final StreamContext PARALLEL = new StreamContext(true);
 
     boolean parallel;
-    ForkJoinPool fjp;
-    Runnable closeHandler;
+    @Nullable ForkJoinPool fjp;
+    @Nullable Runnable closeHandler;
 
     private StreamContext(boolean parallel) {
         this.parallel = parallel;
     }
 
-    <T> T terminate(Supplier<T> terminalOperation) {
+    <T extends @Nullable Object> T terminate(Supplier<T> terminalOperation) {
         return fjp.submit(terminalOperation::get).join();
     }
 
-    <T, U> T terminate(U value, Function<U, T> terminalOperation) {
+    <T extends @Nullable Object, U extends @Nullable Object> T terminate(U value, Function<U, T> terminalOperation) {
         return fjp.submit(() -> terminalOperation.apply(value)).join();
     }
 
@@ -99,7 +103,7 @@ import java.util.stream.BaseStream;
         }
     }
 
-    static Runnable compose(Runnable r1, Runnable r2) {
+    static Runnable compose(@Nullable Runnable r1, Runnable r2) {
         if (r1 == null)
             return r2;
         return () -> {
@@ -117,7 +121,7 @@ import java.util.stream.BaseStream;
         };
     }
 
-    StreamContext combine(BaseStream<?, ?> other) {
+    StreamContext combine(@Nullable BaseStream<?, ?> other) {
         if (other == null)
             return this;
         StreamContext otherStrategy = of(other);

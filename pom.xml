@@ -1,5 +1,5 @@
 <!--
-  ~ Copyright 2015, 2023 StreamEx contributors
+  ~ Copyright 2015, 2024 StreamEx contributors
   ~
   ~ Licensed under the Apache License, Version 2.0 (the "License");
   ~ you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@
 
   <groupId>one.util</groupId>
   <artifactId>streamex</artifactId>
-  <version>0.8.2-SNAPSHOT</version>
+  <version>0.9.0-SNAPSHOT</version>
   <packaging>jar</packaging>
 
   <name>StreamEx</name>
@@ -34,7 +34,6 @@
     <project.package.path>one/util/streamex</project.package.path>
     <project.github.repository>amaembo/streamex</project.github.repository>
     <repository.url>git@github.com:${project.github.repository}.git</repository.url>
-    <nexus.url>https://oss.sonatype.org</nexus.url>
     <license.url>https://www.apache.org/licenses/LICENSE-2.0</license.url>
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
@@ -48,18 +47,13 @@
     </license>
   </licenses>
 
-  <distributionManagement>
-    <snapshotRepository>
-      <id>ossrh</id>
-      <url>${nexus.url}/content/repositories/snapshots</url>
-    </snapshotRepository>
-    <repository>
-      <id>ossrh</id>
-      <url>${nexus.url}/service/local/staging/deploy/maven2/</url>
-    </repository>
-  </distributionManagement>
-
   <dependencies>
+    <dependency>
+      <groupId>org.jspecify</groupId>
+      <artifactId>jspecify</artifactId>
+      <version>1.0.0</version>
+      <optional>true</optional>
+    </dependency>
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
@@ -164,30 +158,17 @@
         <version>3.0.1</version>
         <executions>
           <execution>
-            <!-- This execution used just to run javadoc with doclint and 
-              fail on any errors -->
-            <id>verify-javadocs</id>
-            <phase>package</phase>
-            <goals>
-              <goal>javadoc</goal>
-            </goals>
-            <configuration>
-              <quiet>true</quiet>
-            </configuration>
-          </execution>
-          <execution>
-            <!-- This is actualy javadoc build. The doclint cannot be used 
-              here as it fails on JDK sources -->
             <id>attach-javadocs</id>
             <goals>
               <goal>jar</goal>
             </goals>
             <configuration>
-              <sourcepath>${project.build.sourceDirectory};${project.basedir}/src/main/java-mr/9;${project.basedir}/src/main/java-mr/16;${project.build.directory}/jdk</sourcepath>
+              <sourcepath>${project.build.sourceDirectory};${project.basedir}/src/main/java-mr/9;${project.basedir}/src/main/java-mr/16</sourcepath>
               <excludePackageNames>java.util.stream</excludePackageNames>
               <additionalOptions>-Xdoclint:all</additionalOptions>
               <noqualifier>all</noqualifier>
-              <quiet>true</quiet>
+              <verbose>true</verbose>
+              <!--quiet>true</quiet-->
             </configuration>
           </execution>
         </executions>
@@ -205,30 +186,6 @@
           </dependency>
         </dependencies>
         <executions>
-          <execution>
-            <!-- Unpack java.util.stream package from JDK source to inherit 
-              the documentation from it -->
-            <id>prepare</id>
-            <phase>prepare-package</phase>
-            <configuration>
-              <target>
-                <available property="src.zip" file="${java.home}/../src.zip"
-                  value="${java.home}/../src.zip" />
-                <available property="src.zip" file="${java.home}/lib/src.zip"
-                  value="${java.home}/lib/src.zip" />
-                <available property="src.zip" file="${java.home}/src.zip"
-                  value="${java.home}/src.zip" />
-                <unzip src="${src.zip}" dest="${project.build.directory}/jdk">
-                  <patternset>
-                    <include name="java/util/stream/**/*.java" />
-                  </patternset>
-                </unzip>
-              </target>
-            </configuration>
-            <goals>
-              <goal>run</goal>
-            </goals>
-          </execution>
           <execution>
             <id>jacoco-report</id>
             <phase>prepare-package</phase>
@@ -316,14 +273,12 @@
         </configuration>
       </plugin>
       <plugin>
-        <groupId>org.sonatype.plugins</groupId>
-        <artifactId>nexus-staging-maven-plugin</artifactId>
-        <version>1.6.6</version>
+        <groupId>org.sonatype.central</groupId>
+        <artifactId>central-publishing-maven-plugin</artifactId>
+        <version>0.8.0</version>
         <extensions>true</extensions>
         <configuration>
-          <serverId>ossrh</serverId>
-          <nexusUrl>${nexus.url}</nexusUrl>
-          <autoReleaseAfterClose>true</autoReleaseAfterClose>
+          <publishingServerId>central</publishingServerId>
         </configuration>
       </plugin>
       <plugin>

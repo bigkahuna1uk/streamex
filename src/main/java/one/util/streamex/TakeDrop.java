@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2023 StreamEx contributors
+ * Copyright 2015, 2024 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,8 @@
  */
 package one.util.streamex;
 
+import one.util.streamex.Internals.CloneableSpliterator;
+
 import java.util.Comparator;
 import java.util.Spliterator;
 import java.util.Spliterators;
@@ -23,16 +25,7 @@ import java.util.Spliterators.AbstractIntSpliterator;
 import java.util.Spliterators.AbstractLongSpliterator;
 import java.util.Spliterators.AbstractSpliterator;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Consumer;
-import java.util.function.DoubleConsumer;
-import java.util.function.DoublePredicate;
-import java.util.function.IntConsumer;
-import java.util.function.IntPredicate;
-import java.util.function.LongConsumer;
-import java.util.function.LongPredicate;
-import java.util.function.Predicate;
-
-import one.util.streamex.Internals.CloneableSpliterator;
+import java.util.function.*;
 
 /**
  * @author Tagir Valeev

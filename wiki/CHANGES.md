@@ -2,6 +2,16 @@
 
 Check also [MIGRATION.md](MIGRATION.md) for possible compatibility problems.
 
+### 0.9.0
+* [#282] JSpecify nullity annotations added.
+* [#283] Redundant type arguments on IntStreamEx.ofIndices removed
+* [#284] Added: `StreamEx.iterateUntilNull` and `takeUntilNull`.
+* Javadoc proofreading
+
+### 0.8.4
+* [#279] Added: `AbstractStreamEx.mapToEntryPartial`.
+* [#280] Added: `EntryStream.mapKeysPartial` and `mapValuesPartial`
+
 ### 0.8.3
 * Using Java 17 as a build JDK. Compatibility with Java 8+ stays untouched.
 * [#269] Added: `AbstractStreamEx.mapMulti` and friends.

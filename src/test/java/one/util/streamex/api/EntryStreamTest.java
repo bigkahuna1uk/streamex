@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2023 StreamEx contributors
+ * Copyright 2015, 2024 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,24 +15,18 @@
  */
 package one.util.streamex.api;
 
-import java.util.AbstractMap;
+import one.util.streamex.EntryStream;
+import one.util.streamex.IntStreamEx;
+import one.util.streamex.MoreCollectors;
+import one.util.streamex.StreamEx;
+import one.util.streamex.TestHelpers.*;
+import org.junit.FixMethodOrder;
+import org.junit.Test;
+import org.junit.runners.MethodSorters;
+
+import java.util.*;
 import java.util.AbstractMap.SimpleEntry;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
 import java.util.Map.Entry;
-import java.util.NavigableMap;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-import java.util.SortedMap;
-import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -43,33 +37,9 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import org.junit.FixMethodOrder;
-import org.junit.Test;
-import org.junit.runners.MethodSorters;
-
-import one.util.streamex.EntryStream;
-import one.util.streamex.IntStreamEx;
-import one.util.streamex.MoreCollectors;
-import one.util.streamex.StreamEx;
-import one.util.streamex.TestHelpers.Point;
-
 import static java.util.Arrays.asList;
-import static one.util.streamex.TestHelpers.StreamExSupplier;
-import static one.util.streamex.TestHelpers.checkAsString;
-import static one.util.streamex.TestHelpers.checkIllegalStateException;
-import static one.util.streamex.TestHelpers.entryStream;
-import static one.util.streamex.TestHelpers.repeat;
-import static one.util.streamex.TestHelpers.streamEx;
-import static one.util.streamex.TestHelpers.withRandom;
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static one.util.streamex.TestHelpers.*;
+import static org.junit.Assert.*;
 
 /**
  * @author Tagir Valeev
@@ -298,6 +268,29 @@ public class EntryStreamTest {
     }
 
     @Test
+    public void testMapKeysPartial() {
+        Map<Integer, Integer> original = new HashMap<>();
+        original.put(1, 1);
+        original.put(2, 2);
+        original.put(3, 3);
+        original.put(4, 4);
+
+        Map<Integer, Integer> expected = new HashMap<>();
+        expected.put(1, 2);
+        expected.put(2, 4);
+
+        Map<Integer, Integer> actual = EntryStream.of(original)
+                .mapKeysPartial(key -> {
+                    if (key % 2 == 0) {
+                        return Optional.of(key / 2);
+                    }
+                    return Optional.empty();
+                }).toMap();
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
     public void testMapValues() {
         Map<String, String> expected = new HashMap<>();
         expected.put("a", "1");
@@ -305,6 +298,29 @@ public class EntryStreamTest {
         expected.put("ccc", "33");
         Map<String, String> result = EntryStream.of(createMap()).mapValues(String::valueOf).toMap();
         assertEquals(expected, result);
+    }
+
+    @Test
+    public void testMapValuesPartial() {
+        Map<Integer, Integer> original = new HashMap<>();
+        original.put(1, 1);
+        original.put(2, 2);
+        original.put(3, 3);
+        original.put(4, 4);
+
+        Map<Integer, Integer> expected = new HashMap<>();
+        expected.put(2, 1);
+        expected.put(4, 2);
+
+        Map<Integer, Integer> actual = EntryStream.of(original)
+                .mapValuesPartial(value -> {
+                    if (value % 2 == 0) {
+                        return Optional.of(value / 2);
+                    }
+                    return Optional.empty();
+                }).toMap();
+
+        assertEquals(expected, actual);
     }
 
     @Test

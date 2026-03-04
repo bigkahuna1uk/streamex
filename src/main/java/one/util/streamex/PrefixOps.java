@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2023 StreamEx contributors
+ * Copyright 2015, 2024 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,18 +22,9 @@ import java.util.Spliterators.AbstractLongSpliterator;
 import java.util.Spliterators.AbstractSpliterator;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BinaryOperator;
-import java.util.function.Consumer;
-import java.util.function.DoubleBinaryOperator;
-import java.util.function.DoubleConsumer;
-import java.util.function.IntBinaryOperator;
-import java.util.function.IntConsumer;
-import java.util.function.LongBinaryOperator;
-import java.util.function.LongConsumer;
+import java.util.function.*;
 
-import static one.util.streamex.Internals.CloneableSpliterator;
-import static one.util.streamex.Internals.NONE;
-import static one.util.streamex.Internals.none;
+import static one.util.streamex.Internals.*;
 
 /**
  * @author Tagir Valeev

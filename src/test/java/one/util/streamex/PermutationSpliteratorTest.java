@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2023 StreamEx contributors
+ * Copyright 2015, 2024 StreamEx contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,19 +15,16 @@
  */
 package one.util.streamex;
 
+import org.junit.Test;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.Spliterator;
 
-import org.junit.Test;
-
 import static one.util.streamex.TestHelpers.repeat;
 import static one.util.streamex.TestHelpers.withRandom;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 public class PermutationSpliteratorTest {
     private static final String PERMUTATIONS_4 = "0123,0132,0213,0231,0312,0321," + "1023,1032,1203,1230,1302,1320,"
